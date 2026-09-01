@@ -7,67 +7,45 @@ import { useState } from "react";
 export default function HomePage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const handleGoogle = async () => {
-    await signIn("google", { callbackUrl: "/dashboard" });
-  };
-
-  const handleSendOTP = async () => {
-    setLoading(true);
-    setMessage("");
-
-    const res = await fetch("/api/auth/send-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
-
-    const data = await res.json();
-    setLoading(false);
-
-    if (!res.ok) {
-      setMessage(data.error || "Không thể gửi mã xác nhận");
+  const handleSignup = async () => {
+    if (!username.trim() || !password.trim()) {
+      setMessage("Vui lòng nhập username và mật khẩu");
       return;
     }
 
-    setOtpSent(true);
-    setMessage("Mã xác nhận đã được gửi tới email của bạn.");
-  };
-
-  const handleVerifyAndCreate = async () => {
-    if (!otp.trim()) {
-      setMessage("Vui lòng nhập mã xác nhận");
+    if (password !== confirmPassword) {
+      setMessage("Mật khẩu xác nhận không khớp");
       return;
     }
 
     setLoading(true);
     setMessage("");
 
-    const res = await fetch("/api/auth/verify-otp", {
+    const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp }),
+      body: JSON.stringify({ username, password }),
     });
 
     const data = await res.json();
     setLoading(false);
 
     if (!res.ok) {
-      setMessage(data.error || "Xác nhận thất bại");
+      setMessage(data.error || "Đăng ký thất bại");
       return;
     }
 
-    setMessage("Đăng ký thành công. Hãy đăng nhập.");
+    setMessage("Đăng ký thành công. Bạn có thể đăng nhập ngay.");
     setMode("login");
-    setOtpSent(false);
-    setOtp("");
+    setUsername("");
+    setPassword("");
+    setConfirmPassword("");
   };
 
   const handleCredentialsLogin = async () => {
@@ -75,7 +53,7 @@ export default function HomePage() {
     setMessage("");
 
     const res = await signIn("credentials", {
-      email,
+      username,
       password,
       redirect: false,
     });
@@ -83,7 +61,7 @@ export default function HomePage() {
     setLoading(false);
 
     if (res?.error) {
-      setMessage("Email hoặc mật khẩu không đúng");
+      setMessage("Username hoặc mật khẩu không đúng");
       return;
     }
 
@@ -114,44 +92,52 @@ export default function HomePage() {
 
         {mode === "signup" && (
           <div className="space-y-3">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Tên của bạn" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none" />
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none" />
-            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mật khẩu" type="password" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none" />
-
-            {!otpSent ? (
-              <button type="button" onClick={handleSendOTP} disabled={loading} className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
-                {loading ? "Đang gửi..." : "Gửi mã xác nhận"}
-              </button>
-            ) : (
-              <>
-                <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Nhập mã xác nhận" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none" />
-                <button type="button" onClick={handleVerifyAndCreate} disabled={loading} className="w-full rounded-xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
-                  {loading ? "Đang xác nhận..." : "Xác nhận & tạo tài khoản"}
-                </button>
-              </>
-            )}
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Username"
+              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mật khẩu"
+              type="password"
+              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
+            />
+            <input
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Xác nhận mật khẩu"
+              type="password"
+              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
+            />
+            <button type="button" onClick={handleSignup} disabled={loading} className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
+              {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
+            </button>
           </div>
         )}
 
         {mode === "login" && (
           <div className="space-y-3">
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none" />
-            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mật khẩu" type="password" className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none" />
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Username"
+              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
+            />
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mật khẩu"
+              type="password"
+              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
+            />
             <button type="button" onClick={handleCredentialsLogin} disabled={loading} className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
           </div>
         )}
-
-        <div className="my-4 border-t border-white/10" />
-
-        <button
-          type="button"
-          onClick={handleGoogle}
-          className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-medium text-white hover:bg-white/10"
-        >
-          Tiếp tục với Google
-        </button>
 
         {message && <p className="mt-4 text-sm text-amber-300">{message}</p>}
       </div>

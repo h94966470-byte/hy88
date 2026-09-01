@@ -1,8 +1,6 @@
-import crypto from "crypto";
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
-import { createUser, findUserByEmail, hashPassword } from "@/lib/store";
+import { findUserByUsername, hashPassword } from "@/lib/store";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -13,26 +11,20 @@ export const authOptions: NextAuthOptions = {
     signIn: "/",
   },
   providers: [
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ? [
-          GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          }),
-        ]
-      : []),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
+        if (!credentials?.username || !credentials?.password) {
           return null;
         }
 
-        const user = await findUserByEmail(String(credentials.email));
+        const username = String(credentials.username).trim();
+        const user = await findUserByUsername(username);
+
         if (!user || !user.passwordHash) {
           return null;
         }
@@ -43,40 +35,35 @@ export const authOptions: NextAuthOptions = {
 
         return {
           id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
+          name: user.username,
+          username: user.username,
         };
       },
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === "google" && user.email) {
-        const existing = await findUserByEmail(user.email);
-        if (!existing) {
-          await createUser({
-            id: crypto.randomUUID(),
-            name: user.name || user.email.split("@")[0],
-            email: user.email,
-            provider: "google",
-            emailVerified: true,
-            createdAt: new Date().toISOString(),
-          });
-        }
-      }
+    async signIn() {
       return true;
     },
     async jwt({ token, user }) {
       if (user && "id" in user) {
-        token.userId = user.id;
+        const authUser = user as typeof user & {
+          id?: string;
+          username?: string;
+          name?: string | null;
+        };
+        token.userId = authUser.id;
+        token.username = authUser.username ?? authUser.name ?? "guest";
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        const dynamicSession = session as typeof session & { user: { id?: string } };
-        dynamicSession.user.id = String(token.userId ?? session.user.email ?? "guest");
+        const dynamicSession = session as typeof session & {
+          user: { id?: string; username?: string };
+        };
+        dynamicSession.user.id = String(token.userId ?? "guest");
+        dynamicSession.user.username = String(token.username ?? "guest");
       }
       return session;
     },
