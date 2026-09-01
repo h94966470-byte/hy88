@@ -31,7 +31,7 @@ export default async function DashboardPage() {
         <div className="mt-8 grid gap-5 md:grid-cols-3">
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
             <p className="text-sm text-emerald-200">Tài khoản</p>
-            <p className="mt-2 text-2xl font-semibold">{session.user.email}</p>
+            <p className="mt-2 text-2xl font-semibold">{session.user.name || "Người chơi"}</p>
           </div>
           <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-5">
             <p className="text-sm text-cyan-200">Trạng thái</p>

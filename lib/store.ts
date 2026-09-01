@@ -1,5 +1,14 @@
 import crypto from "crypto";
 import { sql } from "@vercel/postgres";
+import { initializeDatabase } from "@/lib/initdb";
+
+async function ensureDatabaseReady() {
+  try {
+    await initializeDatabase();
+  } catch {
+    // ignore initialization errors here; the table may already exist
+  }
+}
 
 export type StoredUser = {
   id: string;
@@ -16,6 +25,7 @@ export function hashPassword(value: string) {
 
 export async function readUsers(): Promise<StoredUser[]> {
   try {
+    await ensureDatabaseReady();
     const result = await sql`SELECT * FROM users`;
     return result.rows.map((row: any) => ({
       id: row.id,
@@ -37,6 +47,7 @@ export async function writeUsers(users: StoredUser[]) {
 
 export async function findUserByUsername(username: string): Promise<StoredUser | null> {
   try {
+    await ensureDatabaseReady();
     const result = await sql`
       SELECT * FROM users
       WHERE LOWER(username) = LOWER(${username})
@@ -62,6 +73,7 @@ export async function findUserByUsername(username: string): Promise<StoredUser |
 
 export async function createUser(user: StoredUser): Promise<StoredUser> {
   try {
+    await ensureDatabaseReady();
     await sql`
       INSERT INTO users (id, username, password_hash, image, provider, created_at)
       VALUES (${user.id}, ${user.username}, ${user.passwordHash || null}, ${user.image || null}, ${user.provider}, ${user.createdAt})
