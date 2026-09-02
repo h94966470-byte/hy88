@@ -33,6 +33,15 @@ type WalletState = {
   createdAt: string;
 };
 
+type LeaderboardEntry = {
+  username: string;
+  balance: number;
+  rounds: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+};
+
 const formatDateKey = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -91,6 +100,7 @@ export default function HomePage() {
   const [wallet, setWallet] = useState<WalletState | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
   const [repaymentAmount, setRepaymentAmount] = useState("");
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
@@ -132,6 +142,28 @@ export default function HomePage() {
       cancelled = true;
       window.clearInterval(refreshInterval);
       window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let cancelled = false;
+    const loadLeaderboard = async () => {
+      const res = await fetch("/api/leaderboard", { cache: "no-store" });
+      if (!cancelled && res.ok) {
+        const data = (await res.json()) as { leaderboard: LeaderboardEntry[] };
+        setLeaderboard(data.leaderboard);
+      }
+    };
+
+    void loadLeaderboard();
+    const refreshInterval = window.setInterval(() => {
+      if (!document.hidden) void loadLeaderboard();
+    }, 10000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshInterval);
     };
   }, [isAuthenticated]);
 
@@ -449,6 +481,50 @@ export default function HomePage() {
               <div className="mb-8 rounded-3xl border border-amber-400/20 bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 p-6">
                 <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Game hub</p>
                 <h1 className="mt-3 text-4xl font-bold">Xin chào, {session.user?.name || "Người chơi"}</h1>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-6 shadow-2xl">
+                <div className="mb-5 flex items-end justify-between gap-4">
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Bảng xếp hạng</p>
+                    <h2 className="mt-2 text-2xl font-bold text-white">Top người chơi theo số tiền</h2>
+                  </div>
+                  <span className="text-xs text-slate-400">Cập nhật tự động</span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px] text-left text-sm">
+                    <thead className="border-b border-white/10 text-xs uppercase tracking-[0.12em] text-slate-400">
+                      <tr>
+                        <th className="px-3 py-3">Hạng</th>
+                        <th className="px-3 py-3">Người chơi</th>
+                        <th className="px-3 py-3 text-right">Số tiền</th>
+                        <th className="px-3 py-3 text-right">Ván chơi</th>
+                        <th className="px-3 py-3 text-right">Thắng</th>
+                        <th className="px-3 py-3 text-right">Thua</th>
+                        <th className="px-3 py-3 text-right">Tỷ lệ thắng</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderboard.map((entry, index) => (
+                        <tr key={entry.username} className="border-b border-white/5 text-slate-200 last:border-0">
+                          <td className="px-3 py-4 font-bold text-amber-300">#{index + 1}</td>
+                          <td className="px-3 py-4 font-semibold text-white">{entry.username}</td>
+                          <td className="px-3 py-4 text-right font-semibold text-emerald-300">{entry.balance.toLocaleString("vi-VN")} VND</td>
+                          <td className="px-3 py-4 text-right">{entry.rounds}</td>
+                          <td className="px-3 py-4 text-right text-emerald-300">{entry.wins}</td>
+                          <td className="px-3 py-4 text-right text-red-300">{entry.losses}</td>
+                          <td className="px-3 py-4 text-right font-semibold">{entry.winRate.toLocaleString("vi-VN")} %</td>
+                        </tr>
+                      ))}
+                      {!leaderboard.length && (
+                        <tr>
+                          <td colSpan={7} className="px-3 py-8 text-center text-slate-400">Chưa có dữ liệu xếp hạng.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
             </>

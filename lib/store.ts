@@ -43,6 +43,15 @@ export type StoredGameRound = {
   won: boolean;
 };
 
+export type LeaderboardEntry = {
+  username: string;
+  balance: number;
+  rounds: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+};
+
 export function hashPassword(value: string) {
   return crypto.createHash("sha256").update(value.trim()).digest("hex");
 }
@@ -308,4 +317,35 @@ export async function getRecentGameRounds(limit = 100): Promise<StoredGameRound[
     playerChoice: row.player_choice,
     won: row.won,
   }));
+}
+
+export async function getLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    SELECT
+      u.username,
+      COALESCE(w.balance, 100000) AS balance,
+      COUNT(g.id)::integer AS rounds,
+      COUNT(g.id) FILTER (WHERE g.won)::integer AS wins,
+      COUNT(g.id) FILTER (WHERE NOT g.won)::integer AS losses
+    FROM users u
+    LEFT JOIN user_wallets w ON w.user_id = u.id
+    LEFT JOIN game_rounds g ON g.user_id = u.id
+    GROUP BY u.id, u.username, w.balance
+    ORDER BY COALESCE(w.balance, 100000) DESC, wins DESC, u.username ASC
+    LIMIT ${limit}
+  `;
+
+  return (result.rows as Array<{ username: string; balance: string | number; rounds: string | number; wins: string | number; losses: string | number }>).map((row) => {
+    const rounds = Number(row.rounds);
+    const wins = Number(row.wins);
+    return {
+      username: row.username,
+      balance: Number(row.balance),
+      rounds,
+      wins,
+      losses: Number(row.losses),
+      winRate: rounds ? Math.round((wins / rounds) * 1000) / 10 : 0,
+    };
+  });
 }
