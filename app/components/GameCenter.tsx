@@ -30,7 +30,7 @@ interface GameCenterProps {
     newbieDailyClaimDate: string | null;
     createdAt: string;
   } | null;
-  onWalletUpdate: (newBalance: number, newDebt: number) => void;
+  onWalletUpdate: (newBalance: number, newDebt: number) => Promise<boolean>;
 }
 
 export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) {
@@ -102,10 +102,17 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       newBalance = 0;
     }
 
-    onWalletUpdate(newBalance, newDebt);
+    const walletSaved = await onWalletUpdate(newBalance, newDebt);
+    if (!walletSaved) {
+      setRolling(false);
+      setPlaying(false);
+      setMessage("Không thể lưu kết quả ván chơi. Vui lòng thử lại.");
+      return;
+    }
+
     const newRound: RoundPoint = { result, playerChoice: choice, won };
     setRoundHistory((current) => [...current, newRound].slice(-100));
-    void fetch("/api/games", {
+    await fetch("/api/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newRound),
