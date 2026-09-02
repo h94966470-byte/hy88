@@ -121,7 +121,7 @@ export function getFinalWinRate(
   winStreak: number,
   lossStreak: number,
 ): number {
-  if (customWinRate !== null) {
+  if (typeof customWinRate === "number") {
     if (!Number.isFinite(customWinRate) || customWinRate < 0 || customWinRate > 1) {
       throw new Error("INVALID_CUSTOM_RATE");
     }
@@ -461,6 +461,8 @@ export async function resolveGameRound(
     throw new Error("INVALID_BET_AMOUNT");
   }
 
+  const { customRate } = await getAppSettings();
+  const winRate = getFinalWinRate(customRate, wallet.balance, wallet.winStreak, wallet.lossStreak);
   const dice = [crypto.randomInt(1, 7), crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
   const total = dice[0] + dice[1] + dice[2];
   const result = total > 10 ? "tai" : "xiu";
@@ -485,6 +487,14 @@ export async function resolveGameRound(
   } else {
     won = selectedCount > 0;
     multiplier = selectedCount;
+  }
+
+  if (typeof customRate === "number") {
+    won = customRate === 0
+      ? false
+      : customRate === 1
+        ? true
+        : crypto.randomInt(0, 10000) < Math.floor(winRate * 10000);
   }
 
   const profit = won ? Math.floor(expectedAmount * multiplier) : -expectedAmount;
