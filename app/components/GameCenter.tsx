@@ -62,14 +62,16 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [message, setMessage] = useState("");
   const [roundHistory, setRoundHistory] = useState<RoundPoint[]>([]);
+  const [totalRounds, setTotalRounds] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     const loadRounds = async () => {
       const response = await fetch("/api/games", { cache: "no-store" });
       if (!cancelled && response.ok) {
-        const data = (await response.json()) as { rounds: RoundPoint[] };
-        setRoundHistory(data.rounds);
+        const data = (await response.json()) as { rounds: RoundPoint[]; totalRounds: number };
+        setRoundHistory(data.rounds.slice(-30));
+        setTotalRounds(data.totalRounds);
       }
     };
 
@@ -181,7 +183,8 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     }
 
     await onWalletUpdate(gameData.wallet.balance, gameData.wallet.debt);
-    setRoundHistory((current) => [...current, newRound].slice(-100));
+    setRoundHistory((current) => [...current, newRound].slice(-30));
+    setTotalRounds((current) => current + 1);
 
     setGameResult({
       dice,
@@ -245,7 +248,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
               </div>
               <div>
                 <p className="text-xs text-blue-300 uppercase">Ván</p>
-                <p className="mt-1 text-2xl font-bold text-white">{roundHistory.length}</p>
+                <p className="mt-1 text-2xl font-bold text-white">{totalRounds}</p>
               </div>
             </div>
           </div>
@@ -450,7 +453,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
             </div>
             <div className="flex justify-between text-slate-400">
               <span>Tổng số ván</span>
-              <span className="font-bold text-white">{roundHistory.length}</span>
+              <span className="font-bold text-white">{totalRounds}</span>
             </div>
           </div>
 

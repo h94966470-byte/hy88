@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { applyGameResult, getRecentGameRounds, StoredGameRound } from "@/lib/store";
+import { applyGameResult, getGameRoundCount, getRecentGameRounds, StoredGameRound } from "@/lib/store";
 
 const getUserId = async () => {
   const session = await getServerSession(authOptions);
@@ -12,7 +12,8 @@ export async function GET() {
   if (!(await getUserId())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    return NextResponse.json({ rounds: await getRecentGameRounds() });
+    const [rounds, totalRounds] = await Promise.all([getRecentGameRounds(), getGameRoundCount()]);
+    return NextResponse.json({ rounds, totalRounds });
   } catch (error) {
     console.error("Get game rounds error:", error);
     return NextResponse.json({ error: "Không thể tải lịch sử ván chơi" }, { status: 500 });

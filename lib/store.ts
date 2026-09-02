@@ -344,7 +344,7 @@ export async function applyGameResult(
   return mapWallet(result.rows[0] as WalletRow);
 }
 
-export async function getRecentGameRounds(limit = 100): Promise<StoredGameRound[]> {
+export async function getRecentGameRounds(limit = 30): Promise<StoredGameRound[]> {
   await ensureDatabaseReady();
   const result = await sql`
     SELECT result, player_choice, won, wager_mode, selected_number, total, dice_1, dice_2, dice_3
@@ -361,6 +361,12 @@ export async function getRecentGameRounds(limit = 100): Promise<StoredGameRound[
     total: row.total ?? 0,
     dice: [row.dice_1 ?? 0, row.dice_2 ?? 0, row.dice_3 ?? 0],
   }));
+}
+
+export async function getGameRoundCount(): Promise<number> {
+  await ensureDatabaseReady();
+  const result = await sql`SELECT COUNT(*)::integer AS count FROM game_rounds`;
+  return Number((result.rows[0] as { count: string | number }).count);
 }
 
 export async function getLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
