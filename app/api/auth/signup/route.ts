@@ -1,8 +1,14 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createUser, findUserByUsername, hashPassword, countAccountsByDeviceId, addDeviceAccount } from "@/lib/store";
+import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  const rateLimit = await checkRateLimit(req, "1/hour");
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.retryAfter, "Bạn chỉ có thể đăng ký 1 tài khoản mỗi giờ từ IP này.");
+  }
+
   try {
     const rawBody = await req.text();
     const body = rawBody ? JSON.parse(rawBody) : {};
