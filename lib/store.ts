@@ -225,8 +225,10 @@ export async function countAccountsByDeviceId(deviceId: string): Promise<number>
   try {
     await ensureDatabaseReady();
     const result = await sql`
-      SELECT COUNT(*) as count FROM device_accounts
-      WHERE device_id = ${deviceId}
+      SELECT COUNT(*) as count
+      FROM device_accounts d
+      INNER JOIN users u ON u.username = d.username
+      WHERE d.device_id = ${deviceId}
     `;
     return parseInt(result.rows[0]?.count ?? "0", 10);
   } catch (error) {
@@ -629,6 +631,20 @@ export async function setUserBanned(userId: string, banned: boolean): Promise<vo
 
 export async function deleteUser(userId: string): Promise<void> {
   await ensureDatabaseReady();
+  const user = await sql`
+    SELECT username, role
+    FROM users
+    WHERE id = ${userId}
+    LIMIT 1
+  `;
+  const row = user.rows[0] as { username?: string; role?: string } | undefined;
+  if (!row || row.role === "admin") throw new Error("USER_NOT_FOUND_OR_ADMIN");
+
+  await sql`
+    DELETE FROM device_accounts
+    WHERE username = ${row.username}
+  `;
+
   const result = await sql`
     DELETE FROM users
     WHERE id = ${userId}
