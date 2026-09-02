@@ -90,6 +90,7 @@ export default function HomePage() {
   const [message, setMessage] = useState("");
   const [wallet, setWallet] = useState<WalletState | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
+  const [repaymentAmount, setRepaymentAmount] = useState("");
 
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
@@ -176,6 +177,30 @@ export default function HomePage() {
     }
     setWallet(data.wallet);
     setMessage("Bạn đã vay 50.000 VND. Khoản nợ đã được cập nhật.");
+  };
+
+  const handleRepay = async () => {
+    const amount = Number(repaymentAmount);
+    if (!Number.isSafeInteger(amount) || amount <= 0) {
+      setMessage("Nhập số tiền trả nợ hợp lệ.");
+      return;
+    }
+
+    setLoading(true);
+    const res = await fetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "repay", amount }),
+    });
+    const data = (await res.json()) as { wallet?: WalletState; error?: string };
+    setLoading(false);
+    if (!res.ok || !data.wallet) {
+      setMessage(data.error || "Không thể trả nợ");
+      return;
+    }
+    setWallet(data.wallet);
+    setRepaymentAmount("");
+    setMessage(`Đã trả ${amount.toLocaleString("vi-VN")} VND tiền nợ.`);
   };
 
   const handleNewUserDaily = () => {
@@ -294,7 +319,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="mx-auto max-w-6xl px-6 py-10">
+        <section className="mx-auto w-full max-w-[1440px] px-6 py-10">
           {walletLoading ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-slate-300">Đang tải số dư...</div>
           ) : activeMenu === "Sòng bạc" ? (
@@ -336,6 +361,27 @@ export default function HomePage() {
                   <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
                   <p className="mt-2 text-sm text-slate-300">Tối đa 2.000.000 VND tiền nợ.</p>
                 </button>
+
+                <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-5">
+                  <p className="text-sm text-emerald-200">Trả nợ</p>
+                  <input
+                    type="number"
+                    min="1"
+                    value={repaymentAmount}
+                    onChange={(event) => setRepaymentAmount(event.target.value)}
+                    placeholder="Nhập số tiền"
+                    disabled={loading || !wallet?.debt}
+                    className="mt-3 w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRepay}
+                    disabled={loading || !repaymentAmount || !wallet?.debt}
+                    className="mt-3 w-full rounded-xl border border-emerald-400/40 bg-emerald-500/20 px-4 py-3 font-semibold text-emerald-100 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Xác nhận trả nợ
+                  </button>
+                </div>
 
                 <button
                   type="button"

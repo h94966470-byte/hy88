@@ -242,6 +242,25 @@ export async function borrowWallet(userId: string): Promise<StoredWallet> {
   return mapWallet(result.rows[0] as WalletRow);
 }
 
+export async function repayWallet(userId: string, amount: number): Promise<StoredWallet> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    UPDATE user_wallets
+    SET balance = balance - ${amount},
+        debt = debt - ${amount},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}
+      AND ${amount} > 0
+      AND ${amount} <= balance
+      AND ${amount} <= debt
+    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+  `;
+  if (!result.rows.length) {
+    throw new Error("REPAYMENT_INVALID");
+  }
+  return mapWallet(result.rows[0] as WalletRow);
+}
+
 export async function createGameRound(userId: string, round: StoredGameRound): Promise<void> {
   await ensureDatabaseReady();
   await sql`

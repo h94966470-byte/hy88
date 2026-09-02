@@ -10,11 +10,18 @@ type GameResult = {
   won: boolean;
   profit: number;
   triple: boolean;
+  wagerLabel: string;
+  wagerMode: WagerMode;
 };
 
 const INTEREST_RATE = 0.2;
 const MULTIPLIER_ALL = 2.0;
 const MULTIPLIER_HALF = 1.5;
+const TRIPLE_MULTIPLIER = 150;
+const PAIR_MULTIPLIER = 10;
+const TOTAL_MULTIPLIER = 8;
+
+type WagerMode = "tai-xiu" | "triple" | "pair" | "total" | "single";
 
 const secureRandomInt = (min: number, max: number) => {
   const range = max - min + 1;
@@ -44,6 +51,8 @@ interface GameCenterProps {
 export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) {
   const [betAmount, setBetAmount] = useState("");
   const [betType, setBetType] = useState<"custom" | "half" | "all">("custom");
+    const [wagerMode, setWagerMode] = useState<WagerMode>("tai-xiu");
+    const [selectedNumber, setSelectedNumber] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
@@ -74,11 +83,13 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
   const actualBalance = wallet.balance;
 
-  const rollGame = async (choice: "tai" | "xiu") => {
+  const rollGame = async (choice?: "tai" | "xiu") => {
     if (!betAmount && betType === "custom") {
       setMessage("Nhập tiền cược");
       return;
     }
+
+    if (wagerMode === "tai-xiu" && !choice) return;
 
     const amount = betType === "all" ? actualBalance : betType === "half" ? Math.floor(actualBalance / 2) : Number(betAmount);
     if (!amount || amount <= 0 || amount > actualBalance) {
@@ -104,10 +115,35 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     const total = dice1 + dice2 + dice3;
     const result = targetResult;
     const triple = dice1 === dice2 && dice2 === dice3;
+    const selectedCount = dice.filter((die) => die === selectedNumber).length;
 
     const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * INTEREST_RATE) : 0;
-    const won = !triple && result === choice;
-    const multiplier = betType === "all" ? MULTIPLIER_ALL : betType === "half" ? MULTIPLIER_HALF : 1.0;
+    const taiXiuMultiplier = betType === "all" ? MULTIPLIER_ALL : betType === "half" ? MULTIPLIER_HALF : 1.0;
+    let won = false;
+    let multiplier = 0;
+    let wagerLabel = "";
+
+    if (wagerMode === "tai-xiu") {
+      won = !triple && result === choice;
+      multiplier = taiXiuMultiplier;
+      wagerLabel = choice === "tai" ? "Cửa Tài" : "Cửa Xỉu";
+    } else if (wagerMode === "triple") {
+      won = triple && dice1 === selectedNumber;
+      multiplier = TRIPLE_MULTIPLIER;
+      wagerLabel = `Bộ ba ${selectedNumber}`;
+    } else if (wagerMode === "pair") {
+      won = !triple && selectedCount === 2;
+      multiplier = PAIR_MULTIPLIER;
+      wagerLabel = `Cặp ${selectedNumber}`;
+    } else if (wagerMode === "total") {
+      won = total === selectedNumber;
+      multiplier = TOTAL_MULTIPLIER;
+      wagerLabel = `Tổng ${selectedNumber}`;
+    } else {
+      won = selectedCount > 0;
+      multiplier = selectedCount;
+      wagerLabel = `Số ${selectedNumber} (${selectedCount} lần)`;
+    }
 
     const profit = won ? Math.floor(amount * multiplier) : -amount;
     let newBalance = actualBalance + profit;
@@ -118,7 +154,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       newBalance = 0;
     }
 
-    const newRound: RoundPoint = { result, playerChoice: choice, won };
+    const newRound: RoundPoint = { result, playerChoice: choice ?? result, won };
     const gameResponse = await fetch("/api/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -139,19 +175,21 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       dice,
       total,
       result,
-      playerChoice: choice,
+      playerChoice: choice ?? result,
       won,
       triple,
       profit,
+      wagerLabel,
+      wagerMode,
     });
 
     setRolling(false);
     setMessage(
-      triple
+      triple && wagerMode === "tai-xiu"
         ? `Bộ ba đồng nhất: cả Tài và Xỉu đều thua. Bạn mất ${amount.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
         : won
-          ? `Bạn thắng! Lãi ${profit.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
-          : `Bạn thua ${Math.abs(profit).toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
+          ? `Bạn thắng ${wagerLabel}! Lãi ${profit.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
+          : `Bạn thua ${wagerLabel}. Mất ${Math.abs(profit).toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
     );
     setPlaying(false);
   };
@@ -174,9 +212,9 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       : "M 0,50 C 20,12 30,88 50,50 S 80,12 100,50";
 
   return (
-    <div className="grid gap-8 md:grid-cols-3">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1.65fr)_minmax(420px,1fr)]">
       {/* Game Area */}
-      <div className="md:col-span-2">
+      <div>
         <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
           <div className="mb-8">
             <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Tài Xỉu</p>
@@ -241,11 +279,61 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 </button>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2 sm:grid-cols-5">
+                {([
+                  ["tai-xiu", "Tài / Xỉu"],
+                  ["triple", "Bộ ba"],
+                  ["pair", "Cặp"],
+                  ["total", "Tổng điểm"],
+                  ["single", "Số đơn lẻ"],
+                ] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => {
+                      setWagerMode(mode);
+                      if (mode === "total" && selectedNumber < 4) setSelectedNumber(4);
+                      if (mode !== "total" && selectedNumber > 6) setSelectedNumber(1);
+                    }}
+                    className={`rounded-xl border px-3 py-2 text-sm font-bold transition ${
+                      wagerMode === mode
+                        ? "border-amber-400/60 bg-amber-500/20 text-amber-200"
+                        : "border-slate-500/40 bg-slate-800/50 text-slate-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {wagerMode !== "tai-xiu" && (
+                <div className="space-y-3 rounded-2xl border border-violet-400/30 bg-violet-500/10 p-4">
+                  <label className="block text-sm text-slate-300">
+                    {wagerMode === "triple" ? "Chọn số cho Bộ Ba" : wagerMode === "pair" ? "Chọn số cho Cặp" : wagerMode === "total" ? "Chọn tổng điểm" : "Chọn số cần xuất hiện"}
+                  </label>
+                  <select
+                    value={selectedNumber}
+                    onChange={(event) => setSelectedNumber(Number(event.target.value))}
+                    className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
+                  >
+                    {(wagerMode === "total" ? Array.from({ length: 14 }, (_, index) => index + 4) : [1, 2, 3, 4, 5, 6]).map((number) => (
+                      <option key={number} value={number}>{number}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-300">
+                    {wagerMode === "triple" ? `Thưởng ${TRIPLE_MULTIPLIER}x nếu cả 3 viên là số ${selectedNumber}.` :
+                      wagerMode === "pair" ? `Thưởng ${PAIR_MULTIPLIER}x nếu đúng 2 viên là số ${selectedNumber}.` :
+                        wagerMode === "total" ? `Thưởng ${TOTAL_MULTIPLIER}x nếu tổng chính xác là ${selectedNumber}.` :
+                          "Thưởng 1x, 2x hoặc 3x theo số lần xuất hiện."}
+                  </p>
+                </div>
+              )}
+
+              {wagerMode === "tai-xiu" ? <div className="grid gap-3 md:grid-cols-2">
                 <button
                   onClick={() => {
                     setPlaying(true);
-                    rollGame("tai");
+                    void rollGame("tai");
                   }}
                   disabled={rolling || !betAmount && betType === "custom"}
                   className="rounded-2xl border border-red-400/40 bg-red-500/10 px-6 py-4 font-bold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
@@ -255,14 +343,24 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 <button
                   onClick={() => {
                     setPlaying(true);
-                    rollGame("xiu");
+                    void rollGame("xiu");
                   }}
                   disabled={rolling || !betAmount && betType === "custom"}
                   className="rounded-2xl border border-blue-400/40 bg-blue-500/10 px-6 py-4 font-bold text-blue-200 transition hover:bg-blue-500/20 disabled:opacity-50"
                 >
                   XỈU (&lt;=10)
                 </button>
-              </div>
+              </div> : <button
+                type="button"
+                onClick={() => {
+                  setPlaying(true);
+                  void rollGame();
+                }}
+                disabled={rolling || (!betAmount && betType === "custom")}
+                className="w-full rounded-2xl border border-violet-400/40 bg-violet-500/10 px-6 py-4 font-bold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50"
+              >
+                Đặt cược {wagerMode === "triple" ? "Bộ Ba" : wagerMode === "pair" ? "Cặp" : wagerMode === "total" ? "Tổng Điểm" : "Số Đơn Lẻ"}
+              </button>}
             </div>
           ) : null}
 
@@ -282,13 +380,14 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 <p className="mt-2 text-sm text-slate-300">
                   Kết quả: {gameResult.result === "tai" ? "TÀI" : "XỈU"}
                 </p>
+                <p className="mt-1 text-sm text-amber-200">Cược: {gameResult.wagerLabel}</p>
               </div>
 
               <div
                 className={`rounded-2xl border p-6 ${gameResult.won ? "border-emerald-500/50 bg-emerald-500/20" : "border-red-500/50 bg-red-500/20"}`}
               >
                 <p className={`text-lg font-bold ${gameResult.won ? "text-emerald-200" : "text-red-200"}`}>
-                  {gameResult.triple ? "BỘ BA ĐỒNG NHẤT - THUA" : gameResult.won ? "THẮNG" : "THUA"}
+                  {gameResult.triple && gameResult.wagerMode === "tai-xiu" ? "BỘ BA ĐỒNG NHẤT - THUA" : gameResult.won ? "THẮNG" : "THUA"}
                 </p>
                 <p className={`text-3xl font-bold mt-2 ${gameResult.won ? "text-emerald-300" : "text-red-300"}`}>
                   {gameResult.won ? "+" : "-"}{Math.abs(gameResult.profit).toLocaleString("vi-VN")} K
@@ -317,11 +416,11 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       </div>
 
       {/* Shared round chart */}
-      <div className="md:col-span-1">
-        <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl h-full flex flex-col items-center justify-center text-center">
+      <div>
+        <div className="h-full min-h-[520px] rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl flex flex-col items-center justify-center text-center">
           <p className="text-sm uppercase tracking-[0.24em] text-violet-300 mb-4">Biểu đồ các ván</p>
 
-          <div className="relative w-full aspect-square flex items-center justify-center mb-6 rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3">
+          <div className="relative w-full aspect-[1.6] flex items-center justify-center mb-6 rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3">
             <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" role="img" aria-label="Biểu đồ hình sin kết quả các ván">
               <path d="M 0,50 H 100" stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 3" />
               <path d={chartPath} fill="none" stroke="#c4b5fd" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />

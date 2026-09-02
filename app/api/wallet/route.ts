@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { borrowWallet, claimDailyWallet, claimNewbieWallet, getOrCreateWallet, StoredWallet, updateWallet } from "@/lib/store";
+import { borrowWallet, claimDailyWallet, claimNewbieWallet, getOrCreateWallet, repayWallet, StoredWallet, updateWallet } from "@/lib/store";
 
 const getUserId = async () => {
   const session = await getServerSession(authOptions);
@@ -60,13 +60,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = (await req.json()) as { action?: string; dateKey?: string };
+    const body = (await req.json()) as { action?: string; dateKey?: string; amount?: number };
     if (body.action === "borrow") {
       try {
         return NextResponse.json({ wallet: await borrowWallet(userId) });
       } catch (error) {
         if (error instanceof Error && error.message === "LOAN_LIMIT_REACHED") {
           return NextResponse.json({ error: "Khoản nợ đã đạt giới hạn 2.000.000 VND, không thể vay thêm." }, { status: 409 });
+        }
+        throw error;
+      }
+    }
+
+    if (body.action === "repay") {
+      const amount = Number(body.amount);
+      if (!Number.isSafeInteger(amount) || amount <= 0) {
+        return NextResponse.json({ error: "Số tiền trả nợ không hợp lệ" }, { status: 400 });
+      }
+      try {
+        return NextResponse.json({ wallet: await repayWallet(userId, amount) });
+      } catch (error) {
+        if (error instanceof Error && error.message === "REPAYMENT_INVALID") {
+          return NextResponse.json({ error: "Số tiền trả không được vượt quá số dư hoặc khoản nợ." }, { status: 409 });
         }
         throw error;
       }
