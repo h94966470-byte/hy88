@@ -86,8 +86,33 @@ export type GameStats = {
   single: number;
 };
 
+export type AppSettings = {
+  customRate: number | null;
+};
+
 export function hashPassword(value: string) {
   return crypto.createHash("sha256").update(value.trim()).digest("hex");
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  await ensureDatabaseReady();
+  const result = await sql`SELECT custom_rate FROM app_settings WHERE id = 1`;
+  const customRate = result.rows[0]?.custom_rate;
+  return { customRate: customRate === null || customRate === undefined ? null : Number(customRate) };
+}
+
+export async function setCustomSuccessRate(customRate: number | null): Promise<AppSettings> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    INSERT INTO app_settings (id, custom_rate, updated_at)
+    VALUES (1, ${customRate === null ? null : customRate / 100}, CURRENT_TIMESTAMP)
+    ON CONFLICT (id) DO UPDATE SET
+      custom_rate = EXCLUDED.custom_rate,
+      updated_at = CURRENT_TIMESTAMP
+    RETURNING custom_rate
+  `;
+  const savedRate = result.rows[0]?.custom_rate;
+  return { customRate: savedRate === null || savedRate === undefined ? null : Number(savedRate) };
 }
 
 export async function readUsers(): Promise<StoredUser[]> {
@@ -237,11 +262,14 @@ export async function resolveDiceBet(userId: string, betAmount: number): Promise
     throw new Error("INVALID_BET_AMOUNT");
   }
 
-  let winRate = 0.5;
-  if (wallet.balance < 500000) winRate += 0.05;
-  if (wallet.balance > 5000000) winRate -= 0.05;
-  if (wallet.lossStreak >= 3) winRate += Math.min((wallet.lossStreak - 2) * 0.02, 0.15);
-  if (wallet.winStreak >= 3) winRate -= Math.min((wallet.winStreak - 2) * 0.02, 0.15);
+  const { customRate } = await getAppSettings();
+  let winRate = customRate === null ? 0.5 : customRate;
+  if (customRate === null) {
+    if (wallet.balance < 500000) winRate += 0.05;
+    if (wallet.balance > 5000000) winRate -= 0.05;
+    if (wallet.lossStreak >= 3) winRate += Math.min((wallet.lossStreak - 2) * 0.02, 0.15);
+    if (wallet.winStreak >= 3) winRate -= Math.min((wallet.winStreak - 2) * 0.02, 0.15);
+  }
   winRate = Math.min(0.9, Math.max(0.1, winRate));
 
   const isWin = crypto.randomInt(0, 10000) < Math.floor(winRate * 10000);
@@ -306,7 +334,7 @@ export async function claimDailyWallet(userId: string, dateKey: string): Promise
         updated_at = CURRENT_TIMESTAMP
     WHERE user_id = ${userId}
       AND (daily_claim_date IS NULL OR daily_claim_date <> ${dateKey})
-    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   return result.rows.length ? mapWallet(result.rows[0] as WalletRow) : null;
 }
@@ -326,7 +354,7 @@ export async function claimNewbieWallet(userId: string, dateKey: string): Promis
     WHERE user_id = ${userId}
       AND newbie_step < 7
       AND (newbie_daily_claim_date IS NULL OR newbie_daily_claim_date <> ${dateKey})
-    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   return result.rows.length ? mapWallet(result.rows[0] as WalletRow) : null;
 }
@@ -340,7 +368,7 @@ export async function borrowWallet(userId: string): Promise<StoredWallet> {
         updated_at = CURRENT_TIMESTAMP
     WHERE user_id = ${userId}
       AND debt + 50000 <= 2000000
-    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   if (!result.rows.length) {
     throw new Error("LOAN_LIMIT_REACHED");
@@ -359,7 +387,7 @@ export async function repayWallet(userId: string, amount: number): Promise<Store
       AND ${amount} > 0
       AND ${amount} <= balance
       AND ${amount} <= debt
-    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   if (!result.rows.length) {
     throw new Error("REPAYMENT_INVALID");
@@ -390,7 +418,7 @@ export async function applyGameResult(
     WHERE user_id = ${userId}
       AND balance + ${balanceDelta} >= 0
       AND debt + ${debtDelta} >= 0
-    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
 
   if (!result.rows.length) {
@@ -549,7 +577,7 @@ export async function adjustWalletBalance(userId: string, amount: number): Promi
     ON CONFLICT (user_id) DO UPDATE
       SET balance = user_wallets.balance + ${amount}, updated_at = CURRENT_TIMESTAMP
       WHERE user_wallets.balance + ${amount} >= 0
-    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   if (!result.rows.length) throw new Error("BALANCE_WOULD_BE_NEGATIVE");
   return mapWallet(result.rows[0] as WalletRow);
@@ -566,7 +594,7 @@ export async function adjustWalletDebt(userId: string, amount: number): Promise<
     UPDATE user_wallets
     SET debt = debt + ${amount}, updated_at = CURRENT_TIMESTAMP
     WHERE user_id = ${userId} AND debt + ${amount} >= 0
-    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   if (!result.rows.length) throw new Error("DEBT_WOULD_BE_NEGATIVE");
   return mapWallet(result.rows[0] as WalletRow);

@@ -32,6 +32,8 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<GameStats | null>(null);
+  const [customRate, setCustomRate] = useState<number | null>(null);
+  const [rateInput, setRateInput] = useState("");
 
   const fetchUsers = async () => {
     const response = await fetch("/api/admin/users", { cache: "no-store" });
@@ -69,7 +71,39 @@ export default function AdminDashboard() {
     };
 
     void loadInitialStats();
+    const loadSettings = async () => {
+      const response = await fetch("/api/admin/settings", { cache: "no-store" });
+      const data = (await response.json()) as { customRate?: number | null; error?: string };
+      if (response.ok && "customRate" in data) {
+        setCustomRate(data.customRate ?? null);
+        setRateInput(data.customRate === null || data.customRate === undefined ? "" : String(data.customRate * 100));
+      } else {
+        setMessage(data.error || "Không thể tải cấu hình tỷ lệ");
+      }
+    };
+
+    void loadSettings();
   }, []);
+
+  const handleSaveRate = async (newRate: number | null) => {
+    if (newRate !== null && (!Number.isFinite(newRate) || newRate < 0 || newRate > 100)) {
+      setMessage("Tỷ lệ phải nằm trong khoảng 0 đến 100");
+      return;
+    }
+    const response = await fetch("/api/admin/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newSuccessRate: newRate }),
+    });
+    const data = (await response.json()) as { customRate?: number | null; error?: string };
+    if (!response.ok || !("customRate" in data)) {
+      setMessage(data.error || "Không thể cập nhật tỷ lệ");
+      return;
+    }
+    setCustomRate(data.customRate ?? null);
+    setRateInput(data.customRate === null || data.customRate === undefined ? "" : String(data.customRate * 100));
+    setMessage(data.customRate === null ? "Đã bật tỷ lệ tự động." : "Đã cập nhật tỷ lệ thành công.");
+  };
 
   const adjust = async (userId: string, amount: number, action: "balance" | "debt") => {
     if (!Number.isSafeInteger(amount) || amount === 0) {
@@ -126,6 +160,20 @@ export default function AdminDashboard() {
         </div>
 
         {message && <p className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">{message}</p>}
+
+        <section className="mb-6 rounded-2xl border border-white/10 bg-slate-900/80 p-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold">Tỷ lệ thắng hệ thống</h2>
+              <p className="mt-1 text-sm text-slate-400">{customRate === null ? "Đang dùng thuật toán tự động" : `Đang dùng tỷ lệ tùy chỉnh: ${(customRate * 100).toFixed(2)}%`}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input type="number" min="0" max="100" step="0.01" value={rateInput} onChange={(event) => setRateInput(event.target.value)} placeholder="0 - 100%" className="w-32 rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-white" />
+              <button type="button" onClick={() => void handleSaveRate(rateInput === "" ? null : Number(rateInput))} className="rounded-lg bg-emerald-500/20 px-4 py-2 text-emerald-200">Lưu tỷ lệ</button>
+              <button type="button" onClick={() => void handleSaveRate(null)} className="rounded-lg bg-white/10 px-4 py-2 text-slate-200">Tự động</button>
+            </div>
+          </div>
+        </section>
 
         {stats && (
           <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

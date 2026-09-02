@@ -88,6 +88,14 @@ export async function initializeDatabase() {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        custom_rate NUMERIC(5, 4),
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS game_rounds (
         id UUID PRIMARY KEY,
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
