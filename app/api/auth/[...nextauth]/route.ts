@@ -9,7 +9,7 @@ export { handler as GET };
 
 export async function POST(req: NextRequest) {
 	if (req.nextUrl.pathname.endsWith("/callback/credentials")) {
-		const rateLimit = await checkRateLimit(req, "3/minute");
+		const rateLimit = await checkRateLimit(req, "5/minute");
 		if (!rateLimit.success) {
 			return rateLimitResponse(rateLimit.retryAfter, "Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau.");
 		}

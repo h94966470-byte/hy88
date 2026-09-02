@@ -299,20 +299,29 @@ export default function HomePage() {
     setLoading(true);
     setMessage("");
 
-    const res = await signIn("credentials", {
-      username,
-      password,
-      redirect: false,
-    });
+    try {
+      const res = await signIn("credentials", {
+        username,
+        password,
+        redirect: false,
+      });
 
-    setLoading(false);
+      if (res?.status === 429) {
+        setMessage("Bạn đã đăng nhập quá 5 lần trong một phút. Vui lòng thử lại sau.");
+        return;
+      }
 
-    if (res?.error) {
-      setMessage("Username hoặc mật khẩu không đúng");
-      return;
+      if (res?.error) {
+        setMessage("Username hoặc mật khẩu không đúng");
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setMessage("Không thể đăng nhập. Vui lòng thử lại sau.");
+    } finally {
+      setLoading(false);
     }
-
-    router.refresh();
   };
 
   const handleLogout = async () => {
