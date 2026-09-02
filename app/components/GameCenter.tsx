@@ -54,13 +54,13 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
   const rollGame = async (choice: "tai" | "xiu") => {
     if (!betAmount && betType === "custom") {
-      setMessage("Nhap tien cuoc");
+      setMessage("Nhập tiền cược");
       return;
     }
 
     const amount = betType === "all" ? actualBalance : betType === "half" ? Math.floor(actualBalance / 2) : Number(betAmount);
     if (!amount || amount <= 0 || amount > actualBalance) {
-      setMessage("So tien cuoc khong hop le");
+      setMessage("Số tiền cược không hợp lệ");
       return;
     }
 
@@ -119,8 +119,8 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     setRolling(false);
     setMessage(
       won
-        ? `Ban thang! Lai ${profit.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lai no: ${interestDebt})` : ""}`
-        : `Ban thua ${Math.abs(profit).toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lai no: ${interestDebt})` : ""}`
+        ? `Bạn thắng! Lãi ${profit.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
+        : `Bạn thua ${Math.abs(profit).toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
     );
     setPlaying(false);
   };
@@ -131,22 +131,22 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       <div className="md:col-span-2">
         <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
           <div className="mb-8">
-            <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Tai Xiu</p>
-            <h1 className="mt-2 text-3xl font-bold text-white">Cuoc choi tai xiu</h1>
+            <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Tài Xỉu</p>
+            <h1 className="mt-2 text-3xl font-bold text-white">Cuộc chơi Tài Xỉu</h1>
           </div>
 
           <div className="mb-8 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-xs text-emerald-300 uppercase">So du</p>
+                <p className="text-xs text-emerald-300 uppercase">Số dư</p>
                 <p className="mt-1 text-2xl font-bold text-white">{actualBalance.toLocaleString("vi-VN")}</p>
               </div>
               <div>
-                <p className="text-xs text-red-300 uppercase">No</p>
+                <p className="text-xs text-red-300 uppercase">Nợ</p>
                 <p className="mt-1 text-2xl font-bold text-white">{wallet.debt.toLocaleString("vi-VN")}</p>
               </div>
               <div>
-                <p className="text-xs text-blue-300 uppercase">Van</p>
+                <p className="text-xs text-blue-300 uppercase">Ván</p>
                 <p className="mt-1 text-2xl font-bold text-white">{rounds}</p>
               </div>
             </div>
@@ -155,12 +155,12 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
           {!playing && !gameResult ? (
             <div className="space-y-5">
               <div>
-                <label className="block text-sm text-slate-300 mb-2">Nhap tien cuoc (K)</label>
+                <label className="block text-sm text-slate-300 mb-2">Nhập tiền cược (K)</label>
                 <input
                   type="number"
                   value={betAmount}
                   onChange={(e) => setBetAmount(e.target.value)}
-                  placeholder="Vi du: 10"
+                  placeholder="Ví dụ: 10"
                   disabled={betType !== "custom"}
                   className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none disabled:opacity-50"
                 />
@@ -173,7 +173,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                     betType === "custom" ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
-                  Tuy chi ({betAmount || "0"}K)
+                  Tùy chỉnh ({betAmount || "0"}K)
                 </button>
                 <button
                   onClick={() => setBetType("half")}
@@ -181,7 +181,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                     betType === "half" ? "border-blue-400/60 bg-blue-500/20 text-blue-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
-                  Nua ({Math.floor(actualBalance / 2)}K) x{MULTIPLIER_HALF}
+                  Nửa ({Math.floor(actualBalance / 2)}K) x{MULTIPLIER_HALF}
                 </button>
                 <button
                   onClick={() => setBetType("all")}
@@ -189,7 +189,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                     betType === "all" ? "border-red-400/60 bg-red-500/20 text-red-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
-                  All ({actualBalance}K) x{MULTIPLIER_ALL}
+                  Tất cả ({actualBalance}K) x{MULTIPLIER_ALL}
                 </button>
               </div>
 
@@ -220,7 +220,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
           {playing && rolling && (
             <div className="text-center space-y-6">
-              <p className="text-sm text-slate-300">Dang giao xuc xac...</p>
+              <p className="text-sm text-slate-300">Đang gieo xúc xắc...</p>
               <div className="text-6xl animate-spin">*</div>
             </div>
           )}
@@ -232,7 +232,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   {gameResult.dice[0]} + {gameResult.dice[1]} = {gameResult.total}
                 </p>
                 <p className="mt-2 text-sm text-slate-300">
-                  Ket qua: {gameResult.result === "tai" ? "TAI" : "XIU"}
+                  Kết quả: {gameResult.result === "tai" ? "TÀI" : "XỈU"}
                 </p>
               </div>
 
@@ -240,7 +240,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 className={`rounded-2xl border p-6 ${gameResult.won ? "border-emerald-500/50 bg-emerald-500/20" : "border-red-500/50 bg-red-500/20"}`}
               >
                 <p className={`text-lg font-bold ${gameResult.won ? "text-emerald-200" : "text-red-200"}`}>
-                  {gameResult.won ? "THANG" : "THUA"}
+                  {gameResult.won ? "THẮNG" : "THUA"}
                 </p>
                 <p className={`text-3xl font-bold mt-2 ${gameResult.won ? "text-emerald-300" : "text-red-300"}`}>
                   {gameResult.won ? "+" : "-"}{Math.abs(gameResult.profit).toLocaleString("vi-VN")} K
@@ -255,7 +255,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 }}
                 className="w-full rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 font-semibold text-amber-200 transition hover:bg-amber-500/20"
               >
-                Choi lai
+                  Chơi lại
               </button>
             </div>
           )}
@@ -271,7 +271,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       {/* Cau Display */}
       <div className="md:col-span-1">
         <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl h-full flex flex-col items-center justify-center text-center">
-          <p className="text-sm uppercase tracking-[0.24em] text-violet-300 mb-4">Cau hien tai</p>
+          <p className="text-sm uppercase tracking-[0.24em] text-violet-300 mb-4">Cầu hiện tại</p>
 
           <div className="relative w-full aspect-square flex items-center justify-center mb-6">
             <div className="absolute inset-0 rounded-full border-4 border-violet-500/30 bg-violet-500/10"></div>
@@ -280,11 +280,11 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
           <div className="w-full space-y-2 text-sm">
             <div className="flex justify-between text-slate-400">
-              <span>Trang thai</span>
+              <span>Trạng thái</span>
               <span className="text-violet-300 font-bold">{cau > 500 ? "CAO" : "TRUNG"}</span>
             </div>
             <div className="flex justify-between text-slate-400">
-              <span>Muc do</span>
+              <span>Mức độ</span>
               <div className="flex gap-1">
                 {[...Array(5)].map((_, i) => (
                   <div
@@ -297,7 +297,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
           </div>
 
           <p className="mt-6 text-xs text-slate-400">
-            +{Math.floor(50 * 0.1)}K moi van thua | Reset khi thang
+            +{Math.floor(50 * 0.1)}K mỗi ván thua | Đặt lại khi thắng
           </p>
         </div>
       </div>

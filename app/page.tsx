@@ -310,7 +310,7 @@ export default function HomePage() {
                 </div>
                 {wallet && wallet.debt > 0 && (
                   <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-6 py-4">
-                    <p className="text-sm text-red-300">No</p>
+                    <p className="text-sm text-red-300">Nợ</p>
                     <p className="mt-2 text-2xl font-bold text-red-200">{wallet.debt.toLocaleString("vi-VN")} VND</p>
                   </div>
                 )}
