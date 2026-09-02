@@ -27,6 +27,7 @@ type WalletState = {
   balance: number;
   dailyClaimDate: string | null;
   newbieStep: number;
+  newbieDailyClaimDate: string | null;
   createdAt: string;
 };
 
@@ -43,6 +44,7 @@ const createDefaultWallet = (): WalletState => ({
   balance: 100000,
   dailyClaimDate: null,
   newbieStep: 0,
+  newbieDailyClaimDate: null,
   createdAt: new Date().toISOString(),
 });
 
@@ -81,6 +83,7 @@ export default function HomePage() {
       const normalized: WalletState = {
         balance: Number(parsed.balance) || 100000,
         dailyClaimDate: parsed.dailyClaimDate || null,
+        newbieDailyClaimDate: parsed.newbieDailyClaimDate || null,
         newbieStep: Number(parsed.newbieStep) || 0,
         createdAt: parsed.createdAt || new Date().toISOString(),
       };
@@ -121,9 +124,15 @@ export default function HomePage() {
   const handleNewUserDaily = () => {
     if (!wallet) return;
     const newbieRewards = [300000, 200000, 100000, 100000, 100000, 100000, 100000];
+    const todayKey = formatDateKey(new Date());
 
     if (wallet.newbieStep >= newbieRewards.length) {
       setMessage("Nút Daily người mới đã hết hiệu lực.");
+      return;
+    }
+
+    if (wallet.newbieDailyClaimDate === todayKey) {
+      setMessage("Bạn đã nhận Daily người mới hôm nay rồi.");
       return;
     }
 
@@ -132,6 +141,7 @@ export default function HomePage() {
       ...wallet,
       balance: wallet.balance + reward,
       newbieStep: wallet.newbieStep + 1,
+      newbieDailyClaimDate: todayKey,
     };
 
     persistWallet(nextWallet);
@@ -236,9 +246,6 @@ export default function HomePage() {
                 <div>
                   <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Ví tiền</p>
                   <h1 className="mt-2 text-4xl font-bold text-white">{wallet ? `${wallet.balance.toLocaleString("vi-VN")} VND` : "0 VND"}</h1>
-                </div>
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                  Tài khoản mới: 100.000 VND
                 </div>
               </div>
 
