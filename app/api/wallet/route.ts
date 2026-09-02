@@ -62,7 +62,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as { action?: string; dateKey?: string };
     if (body.action === "borrow") {
-      return NextResponse.json({ wallet: await borrowWallet(userId) });
+      try {
+        return NextResponse.json({ wallet: await borrowWallet(userId) });
+      } catch (error) {
+        if (error instanceof Error && error.message === "LOAN_LIMIT_REACHED") {
+          return NextResponse.json({ error: "Khoản nợ đã đạt giới hạn 2.000.000 VND, không thể vay thêm." }, { status: 409 });
+        }
+        throw error;
+      }
     }
 
     if (!body.dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(body.dateKey)) {

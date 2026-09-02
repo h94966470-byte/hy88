@@ -194,7 +194,7 @@ export default function HomePage() {
       return;
     }
     setWallet(data.wallet);
-    setMessage("Bạn đã vay 100.000 VND. Khoản nợ đã được cập nhật.");
+    setMessage("Bạn đã vay 50.000 VND. Khoản nợ đã được cập nhật.");
   };
 
   const handleNewUserDaily = () => {
@@ -352,8 +352,8 @@ export default function HomePage() {
                   className="rounded-2xl border border-red-400/40 bg-red-500/10 p-5 text-left transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <p className="text-sm text-red-200">Vay nợ</p>
-                  <p className="mt-2 text-2xl font-bold text-white">+100.000 VND</p>
-                  <p className="mt-2 text-sm text-slate-300">Cộng vào số dư và khoản nợ hiện tại.</p>
+                  <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
+                  <p className="mt-2 text-sm text-slate-300">Tối đa 2.000.000 VND tiền nợ.</p>
                 </button>
 
                 <button

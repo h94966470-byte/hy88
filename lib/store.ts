@@ -229,12 +229,16 @@ export async function borrowWallet(userId: string): Promise<StoredWallet> {
   await ensureDatabaseReady();
   const result = await sql`
     UPDATE user_wallets
-    SET balance = balance + 100000,
-        debt = debt + 100000,
+    SET balance = balance + 50000,
+        debt = debt + 50000,
         updated_at = CURRENT_TIMESTAMP
     WHERE user_id = ${userId}
+      AND debt + 50000 <= 2000000
     RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
+  if (!result.rows.length) {
+    throw new Error("LOAN_LIMIT_REACHED");
+  }
   return mapWallet(result.rows[0] as WalletRow);
 }
 
