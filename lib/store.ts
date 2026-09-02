@@ -136,6 +136,15 @@ export function getFinalWinRate(
   return Math.min(0.9, Math.max(0.1, automaticRate));
 }
 
+export function generateDice(targetResult: "TAI" | "XIU"): [number, number, number] {
+  while (true) {
+    const dice: [number, number, number] = [crypto.randomInt(1, 7), crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
+    const total = dice[0] + dice[1] + dice[2];
+    const matchesTarget = targetResult === "TAI" ? total >= 11 && total <= 17 : total >= 4 && total <= 10;
+    if (matchesTarget) return dice;
+  }
+}
+
 export async function readUsers(): Promise<StoredUser[]> {
   try {
     await ensureDatabaseReady();
@@ -463,7 +472,16 @@ export async function resolveGameRound(
 
   const { customRate } = await getAppSettings();
   const winRate = getFinalWinRate(customRate, wallet.balance, wallet.winStreak, wallet.lossStreak);
-  const dice = [crypto.randomInt(1, 7), crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
+  const forcedWin = typeof customRate === "number"
+    ? customRate === 0
+      ? false
+      : customRate === 1
+        ? true
+        : crypto.randomInt(0, 10000) < Math.floor(winRate * 10000)
+    : null;
+  const dice: [number, number, number] = typeof customRate === "number" && wagerMode === "tai-xiu" && playerChoice
+    ? generateDice((forcedWin ? playerChoice : playerChoice === "tai" ? "xiu" : "tai").toUpperCase() as "TAI" | "XIU")
+    : [crypto.randomInt(1, 7), crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
   const total = dice[0] + dice[1] + dice[2];
   const result = total > 10 ? "tai" : "xiu";
   const triple = dice[0] === dice[1] && dice[1] === dice[2];
@@ -489,13 +507,7 @@ export async function resolveGameRound(
     multiplier = selectedCount;
   }
 
-  if (typeof customRate === "number") {
-    won = customRate === 0
-      ? false
-      : customRate === 1
-        ? true
-        : crypto.randomInt(0, 10000) < Math.floor(winRate * 10000);
-  }
+  if (forcedWin !== null) won = forcedWin;
 
   const profit = won ? Math.floor(expectedAmount * multiplier) : -expectedAmount;
   const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * 0.2) : 0;
