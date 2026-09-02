@@ -40,8 +40,6 @@ const formatDateKey = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const getWalletStorageKey = (username?: string | null) => `hy88-wallet-${username || "guest"}`;
-
 const generateDeviceId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
@@ -80,15 +78,6 @@ const addDeviceAccount = (username: string) => {
   }
 };
 
-const createDefaultWallet = (): WalletState => ({
-  balance: 100000,
-  debt: 0,
-  dailyClaimDate: null,
-  newbieStep: 0,
-  newbieDailyClaimDate: null,
-  createdAt: new Date().toISOString(),
-});
-
 export default function HomePage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -100,48 +89,53 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [wallet, setWallet] = useState<WalletState | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
 
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setWallet(null);
       return;
     }
 
-    const walletKey = getWalletStorageKey(session.user?.name || session.user?.email || "guest");
-    const saved = localStorage.getItem(walletKey);
+    let cancelled = false;
+    const loadWallet = async () => {
+      setWalletLoading(true);
+      const res = await fetch("/api/wallet", { cache: "no-store" });
+      if (cancelled) return;
+      if (res.ok) {
+        const data = (await res.json()) as { wallet: WalletState };
+        setWallet(data.wallet);
+      } else {
+        setMessage("Không thể tải số dư tài khoản.");
+      }
+      setWalletLoading(false);
+    };
 
-    if (!saved) {
-      const initialWallet = createDefaultWallet();
-      localStorage.setItem(walletKey, JSON.stringify(initialWallet));
-      setWallet(initialWallet);
-      return;
-    }
+    void loadWallet();
+    const refreshInterval = window.setInterval(() => void loadWallet(), 5000);
+    window.addEventListener("focus", loadWallet);
 
-    try {
-      const parsed = JSON.parse(saved) as WalletState;
-      const normalized: WalletState = {
-        balance: Number(parsed.balance) || 100000,
-        debt: Number(parsed.debt) || 0,
-        dailyClaimDate: parsed.dailyClaimDate || null,
-        newbieDailyClaimDate: parsed.newbieDailyClaimDate || null,
-        newbieStep: Number(parsed.newbieStep) || 0,
-        createdAt: parsed.createdAt || new Date().toISOString(),
-      };
-      setWallet(normalized);
-    } catch {
-      const initialWallet = createDefaultWallet();
-      localStorage.setItem(walletKey, JSON.stringify(initialWallet));
-      setWallet(initialWallet);
-    }
-  }, [isAuthenticated, session?.user?.name, session?.user?.email]);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshInterval);
+      window.removeEventListener("focus", loadWallet);
+    };
+  }, [isAuthenticated]);
 
-  const persistWallet = (nextWallet: WalletState) => {
+  const persistWallet = async (nextWallet: WalletState) => {
     if (!isAuthenticated) return;
-    const walletKey = getWalletStorageKey(session.user?.name || session.user?.email || "guest");
-    localStorage.setItem(walletKey, JSON.stringify(nextWallet));
-    setWallet(nextWallet);
+    const res = await fetch("/api/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(nextWallet),
+    });
+    if (!res.ok) {
+      setMessage("Không thể đồng bộ số dư. Vui lòng thử lại.");
+      return;
+    }
+    const data = (await res.json()) as { wallet: WalletState };
+    setWallet(data.wallet);
   };
 
   const handleGameWalletUpdate = (newBalance: number, newDebt: number) => {
@@ -151,7 +145,7 @@ export default function HomePage() {
       balance: newBalance,
       debt: newDebt,
     };
-    persistWallet(nextWallet);
+    void persistWallet(nextWallet);
   };
 
   const handleDailyBonus = () => {
@@ -169,7 +163,7 @@ export default function HomePage() {
       dailyClaimDate: todayKey,
     };
 
-    persistWallet(nextWallet);
+    void persistWallet(nextWallet);
     setMessage("Bạn đã nhận 50.000 VND từ Daily.");
   };
 
@@ -196,7 +190,7 @@ export default function HomePage() {
       newbieDailyClaimDate: todayKey,
     };
 
-    persistWallet(nextWallet);
+    void persistWallet(nextWallet);
     setMessage(`Bạn nhận ${reward.toLocaleString("vi-VN")} VND từ Daily người mới.`);
   };
 
@@ -300,7 +294,9 @@ export default function HomePage() {
         </header>
 
         <section className="mx-auto max-w-6xl px-6 py-10">
-          {activeMenu === "Sòng bạc" ? (
+          {walletLoading ? (
+            <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-slate-300">Đang tải số dư...</div>
+          ) : activeMenu === "Sòng bạc" ? (
             <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
           ) : activeMenu === "Ví" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">

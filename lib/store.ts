@@ -28,6 +28,15 @@ export type StoredUser = {
   createdAt: string;
 };
 
+export type StoredWallet = {
+  balance: number;
+  debt: number;
+  dailyClaimDate: string | null;
+  newbieStep: number;
+  newbieDailyClaimDate: string | null;
+  createdAt: string;
+};
+
 export function hashPassword(value: string) {
   return crypto.createHash("sha256").update(value.trim()).digest("hex");
 }
@@ -125,4 +134,53 @@ export async function addDeviceAccount(deviceId: string, username: string): Prom
   } catch (error) {
     console.error("❌ addDeviceAccount error:", error);
   }
+}
+
+type WalletRow = {
+  balance: string | number;
+  debt: string | number;
+  daily_claim_date: string | null;
+  newbie_step: number;
+  newbie_daily_claim_date: string | null;
+  created_at: string;
+};
+
+const mapWallet = (row: WalletRow): StoredWallet => ({
+  balance: Number(row.balance),
+  debt: Number(row.debt),
+  dailyClaimDate: row.daily_claim_date ? String(row.daily_claim_date).slice(0, 10) : null,
+  newbieStep: Number(row.newbie_step),
+  newbieDailyClaimDate: row.newbie_daily_claim_date ? String(row.newbie_daily_claim_date).slice(0, 10) : null,
+  createdAt: row.created_at,
+});
+
+export async function getOrCreateWallet(userId: string): Promise<StoredWallet> {
+  await ensureDatabaseReady();
+  await sql`
+    INSERT INTO user_wallets (user_id)
+    VALUES (${userId})
+    ON CONFLICT (user_id) DO NOTHING
+  `;
+  const result = await sql`
+    SELECT balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    FROM user_wallets
+    WHERE user_id = ${userId}
+  `;
+  return mapWallet(result.rows[0] as WalletRow);
+}
+
+export async function updateWallet(userId: string, wallet: StoredWallet): Promise<StoredWallet> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    UPDATE user_wallets
+    SET balance = ${wallet.balance},
+        debt = ${wallet.debt},
+        daily_claim_date = ${wallet.dailyClaimDate},
+        newbie_step = ${wallet.newbieStep},
+        newbie_daily_claim_date = ${wallet.newbieDailyClaimDate},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}
+    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+  `;
+  return mapWallet(result.rows[0] as WalletRow);
 }
