@@ -488,8 +488,8 @@ export default function HomePage() {
 
                 <div className="rounded-2xl border border-cyan-400/40 bg-slate-900/80 p-5 shadow-inner shadow-cyan-500/10">
                   <p className="text-sm uppercase tracking-[0.2em] text-cyan-300">Website</p>
-                  <a href="https://hy88-woad.vercel.app/" target="_blank" rel="noreferrer" className="mt-3 block text-xl font-semibold text-white underline decoration-cyan-400/70 underline-offset-4">
-                    https://hy88-woad.vercel.app/
+                  <a href="https://hy88-pi.vercel.app/" target="_blank" rel="noreferrer" className="mt-3 block text-xl font-semibold text-white underline decoration-cyan-400/70 underline-offset-4">
+                    https://hy88-pi.vercel.app/
                   </a>
                 </div>
 
