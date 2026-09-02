@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { adjustWalletBalance, adjustWalletDebt, getAdminUsers, setUserBanned } from "@/lib/store";
+import { adjustWalletBalance, adjustWalletDebt, deleteUser, getAdminUsers, setUserBanned } from "@/lib/store";
 
 const getAdminSession = async () => {
   const session = await getServerSession(authOptions);
@@ -52,5 +52,25 @@ export async function PATCH(req: NextRequest) {
     }
     console.error("Adjust admin wallet error:", error);
     return NextResponse.json({ error: "Không thể cập nhật số dư" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  if (!(await getAdminSession())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  try {
+    const body = (await req.json()) as { userId?: unknown };
+    if (typeof body.userId !== "string" || !body.userId) {
+      return NextResponse.json({ error: "Tài khoản không hợp lệ" }, { status: 400 });
+    }
+
+    await deleteUser(body.userId);
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    if (error instanceof Error && error.message === "USER_NOT_FOUND_OR_ADMIN") {
+      return NextResponse.json({ error: "Không thể xóa tài khoản Admin hoặc tài khoản không tồn tại" }, { status: 409 });
+    }
+    console.error("Delete admin user error:", error);
+    return NextResponse.json({ error: "Không thể xóa tài khoản" }, { status: 500 });
   }
 }

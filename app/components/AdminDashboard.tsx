@@ -144,6 +144,23 @@ export default function AdminDashboard() {
     await loadUsers();
   };
 
+  const deleteAccount = async (user: AdminUser) => {
+    if (user.role === "admin" || !window.confirm(`Bạn có chắc muốn xóa tài khoản ${user.username}? Dữ liệu ván chơi và ví cũng sẽ bị xóa.`)) return;
+
+    const response = await fetch("/api/admin/users", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id }),
+    });
+    const data = (await response.json()) as { error?: string };
+    if (!response.ok) {
+      setMessage(data.error || "Không thể xóa tài khoản");
+      return;
+    }
+    setMessage(`Đã xóa tài khoản ${user.username}.`);
+    await loadUsers();
+  };
+
   const formatRate = (count: number, total: number) => total ? `${((count / total) * 100).toFixed(1)}%` : "0%";
 
   return (
@@ -205,6 +222,7 @@ export default function AdminDashboard() {
                 <th className="px-4 py-4">Điều chỉnh số dư</th>
                 <th className="px-4 py-4">Điều chỉnh nợ</th>
                 <th className="px-4 py-4">Trạng thái</th>
+                <th className="px-4 py-4">Tài khoản</th>
               </tr>
             </thead>
             <tbody>
@@ -225,9 +243,10 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-4 py-4"><div className="flex gap-2"><input type="number" min="1" value={amounts[`debt-${user.id}`] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [`debt-${user.id}`]: event.target.value }))} placeholder="Tiền nợ" className="w-28 rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-white" /><button type="button" onClick={() => void adjustDebt(user.id, 1)} disabled={loading} className="rounded-lg bg-amber-500/20 px-3 py-2 text-amber-200">Thêm</button><button type="button" onClick={() => void adjustDebt(user.id, -1)} disabled={loading} className="rounded-lg bg-cyan-500/20 px-3 py-2 text-cyan-200">Xóa</button></div></td>
                   <td className="px-4 py-4"><button type="button" onClick={() => void toggleBan(user)} disabled={loading || user.role === "admin"} className="rounded-lg bg-white/10 px-3 py-2 text-slate-200 disabled:cursor-not-allowed disabled:opacity-50">{user.banned ? "Unban" : "Ban"}</button></td>
+                  <td className="px-4 py-4"><button type="button" onClick={() => void deleteAccount(user)} disabled={loading || user.role === "admin"} className="rounded-lg bg-red-500/20 px-3 py-2 text-red-200 disabled:cursor-not-allowed disabled:opacity-50">Xóa</button></td>
                 </tr>
               ))}
-              {!loading && !users.length && <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">Chưa có tài khoản.</td></tr>}
+              {!loading && !users.length && <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-400">Chưa có tài khoản.</td></tr>}
             </tbody>
           </table>
         </div>

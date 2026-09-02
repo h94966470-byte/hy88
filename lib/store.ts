@@ -627,6 +627,17 @@ export async function setUserBanned(userId: string, banned: boolean): Promise<vo
   await sql`UPDATE users SET banned = ${banned} WHERE id = ${userId}`;
 }
 
+export async function deleteUser(userId: string): Promise<void> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    DELETE FROM users
+    WHERE id = ${userId}
+      AND role <> 'admin'
+    RETURNING id
+  `;
+  if (!result.rows.length) throw new Error("USER_NOT_FOUND_OR_ADMIN");
+}
+
 export async function adjustWalletDebt(userId: string, amount: number): Promise<StoredWallet> {
   await ensureDatabaseReady();
   const result = await sql`
