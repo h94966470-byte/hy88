@@ -34,6 +34,8 @@ export async function PATCH(req: NextRequest) {
     const nextWallet: StoredWallet = {
       balance: Number(body.balance),
       debt: Number(body.debt),
+      winStreak: current.winStreak,
+      lossStreak: current.lossStreak,
       dailyClaimDate: body.dailyClaimDate ?? current.dailyClaimDate,
       newbieStep: Number(body.newbieStep),
       newbieDailyClaimDate: body.newbieDailyClaimDate ?? current.newbieDailyClaimDate,

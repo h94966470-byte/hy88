@@ -63,12 +63,24 @@ export async function initializeDatabase() {
         user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         balance BIGINT NOT NULL DEFAULT 100000,
         debt BIGINT NOT NULL DEFAULT 0,
+        win_streak INTEGER NOT NULL DEFAULT 0,
+        loss_streak INTEGER NOT NULL DEFAULT 0,
         daily_claim_date DATE,
         newbie_step INTEGER NOT NULL DEFAULT 0,
         newbie_daily_claim_date DATE,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+
+    await sql`
+      ALTER TABLE user_wallets
+      ADD COLUMN IF NOT EXISTS win_streak INTEGER NOT NULL DEFAULT 0;
+    `;
+
+    await sql`
+      ALTER TABLE user_wallets
+      ADD COLUMN IF NOT EXISTS loss_streak INTEGER NOT NULL DEFAULT 0;
     `;
 
     await sql`

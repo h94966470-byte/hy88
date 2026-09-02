@@ -35,6 +35,8 @@ export type StoredUser = {
 export type StoredWallet = {
   balance: number;
   debt: number;
+  winStreak: number;
+  lossStreak: number;
   dailyClaimDate: string | null;
   newbieStep: number;
   newbieDailyClaimDate: string | null;
@@ -194,6 +196,8 @@ export async function addDeviceAccount(deviceId: string, username: string): Prom
 type WalletRow = {
   balance: string | number;
   debt: string | number;
+  win_streak?: string | number;
+  loss_streak?: string | number;
   daily_claim_date: string | null;
   newbie_step: number;
   newbie_daily_claim_date: string | null;
@@ -203,6 +207,8 @@ type WalletRow = {
 const mapWallet = (row: WalletRow): StoredWallet => ({
   balance: Number(row.balance),
   debt: Number(row.debt),
+  winStreak: Number(row.win_streak ?? 0),
+  lossStreak: Number(row.loss_streak ?? 0),
   dailyClaimDate: row.daily_claim_date ? String(row.daily_claim_date).slice(0, 10) : null,
   newbieStep: Number(row.newbie_step),
   newbieDailyClaimDate: row.newbie_daily_claim_date ? String(row.newbie_daily_claim_date).slice(0, 10) : null,
@@ -217,11 +223,60 @@ export async function getOrCreateWallet(userId: string): Promise<StoredWallet> {
     ON CONFLICT (user_id) DO NOTHING
   `;
   const result = await sql`
-    SELECT balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    SELECT balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
     FROM user_wallets
     WHERE user_id = ${userId}
   `;
   return mapWallet(result.rows[0] as WalletRow);
+}
+
+export async function resolveDiceBet(userId: string, betAmount: number): Promise<{ isWin: boolean; newBalance: number }> {
+  await ensureDatabaseReady();
+  const wallet = await getOrCreateWallet(userId);
+  if (!Number.isSafeInteger(betAmount) || betAmount <= 0 || betAmount > wallet.balance) {
+    throw new Error("INVALID_BET_AMOUNT");
+  }
+
+  let winRate = 0.5;
+  if (wallet.balance < 500000) winRate += 0.05;
+  if (wallet.balance > 5000000) winRate -= 0.05;
+  if (wallet.lossStreak >= 3) winRate += Math.min((wallet.lossStreak - 2) * 0.02, 0.15);
+  if (wallet.winStreak >= 3) winRate -= Math.min((wallet.winStreak - 2) * 0.02, 0.15);
+  winRate = Math.min(0.9, Math.max(0.1, winRate));
+
+  const isWin = crypto.randomInt(0, 10000) < Math.floor(winRate * 10000);
+  const balanceDelta = isWin ? betAmount : -betAmount;
+  const dice = [crypto.randomInt(1, 7), crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
+  const total = dice[0] + dice[1] + dice[2];
+  const result = total > 10 ? "tai" : "xiu";
+  const playerChoice = isWin ? result : result === "tai" ? "xiu" : "tai";
+  const round: StoredGameRound = {
+    result,
+    playerChoice,
+    won: isWin,
+    wagerMode: "tai-xiu",
+    selectedNumber: null,
+    total,
+    dice,
+  };
+
+  const updated = await sql`
+    UPDATE user_wallets
+    SET balance = balance + ${balanceDelta},
+        win_streak = ${isWin ? wallet.winStreak + 1 : 0},
+        loss_streak = ${isWin ? 0 : wallet.lossStreak + 1},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}
+      AND balance = ${wallet.balance}
+      AND win_streak = ${wallet.winStreak}
+      AND loss_streak = ${wallet.lossStreak}
+      AND balance + ${balanceDelta} >= 0
+    RETURNING balance
+  `;
+  if (!updated.rows.length) throw new Error("DICE_WALLET_UPDATE_FAILED");
+
+  await createGameRound(userId, round);
+  return { isWin, newBalance: Number(updated.rows[0].balance) };
 }
 
 export async function updateWallet(userId: string, wallet: StoredWallet): Promise<StoredWallet> {
@@ -230,12 +285,14 @@ export async function updateWallet(userId: string, wallet: StoredWallet): Promis
     UPDATE user_wallets
     SET balance = ${wallet.balance},
         debt = ${wallet.debt},
+        win_streak = ${wallet.winStreak},
+        loss_streak = ${wallet.lossStreak},
         daily_claim_date = ${wallet.dailyClaimDate},
         newbie_step = ${wallet.newbieStep},
         newbie_daily_claim_date = ${wallet.newbieDailyClaimDate},
         updated_at = CURRENT_TIMESTAMP
     WHERE user_id = ${userId}
-    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+    RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   return mapWallet(result.rows[0] as WalletRow);
 }
@@ -389,7 +446,7 @@ export async function resolveGameRound(
   const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * 0.2) : 0;
   let balanceDelta = profit;
   let debtDelta = interestDebt;
-  let nextBalance = wallet.balance + balanceDelta;
+  const nextBalance = wallet.balance + balanceDelta;
   if (nextBalance < 0) {
     debtDelta += Math.abs(nextBalance);
     balanceDelta = -wallet.balance;
