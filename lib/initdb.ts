@@ -18,8 +18,21 @@ export async function initializeDatabase() {
         password_hash VARCHAR(255) NOT NULL,
         image VARCHAR(255),
         provider VARCHAR(50) NOT NULL DEFAULT 'credentials',
+        role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+
+    await sql`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
+    `;
+
+    await sql`
+      UPDATE users
+      SET role = 'admin'
+      WHERE ${process.env.ADMIN_USERNAME ?? ""} <> ''
+        AND LOWER(username) = LOWER(${process.env.ADMIN_USERNAME ?? ""});
     `;
 
     await sql`

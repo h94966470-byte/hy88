@@ -16,6 +16,7 @@ type UserRow = {
   password_hash?: string | null;
   image?: string | null;
   provider: string;
+  role?: "user" | "admin" | null;
   created_at: string | null;
 };
 
@@ -25,6 +26,7 @@ export type StoredUser = {
   passwordHash?: string;
   image?: string;
   provider: "credentials";
+  role: "user" | "admin";
   createdAt: string;
 };
 
@@ -52,6 +54,17 @@ export type LeaderboardEntry = {
   winRate: number;
 };
 
+export type AdminUserEntry = {
+  id: string;
+  username: string;
+  role: "user" | "admin";
+  balance: number;
+  debt: number;
+  rounds: number;
+  wins: number;
+  losses: number;
+};
+
 export function hashPassword(value: string) {
   return crypto.createHash("sha256").update(value.trim()).digest("hex");
 }
@@ -68,6 +81,7 @@ export async function readUsers(): Promise<StoredUser[]> {
       passwordHash: row.password_hash ?? undefined,
       image: row.image ?? undefined,
       provider: row.provider as "credentials",
+      role: row.role === "admin" ? "admin" : "user",
       createdAt: row.created_at ?? new Date().toISOString(),
     }));
   } catch (error) {
@@ -98,6 +112,7 @@ export async function findUserByUsername(username: string): Promise<StoredUser |
       passwordHash: row.password_hash ?? undefined,
       image: row.image ?? undefined,
       provider: row.provider as "credentials",
+      role: row.role === "admin" ? "admin" : "user",
       createdAt: row.created_at ?? new Date().toISOString(),
     };
   } catch (error) {
@@ -109,13 +124,17 @@ export async function findUserByUsername(username: string): Promise<StoredUser |
 export async function createUser(user: StoredUser): Promise<StoredUser> {
   try {
     await ensureDatabaseReady();
+    const role = process.env.ADMIN_USERNAME && process.env.ADMIN_USERNAME.toLowerCase() === user.username.toLowerCase()
+      ? "admin"
+      : user.role;
     await sql`
-      INSERT INTO users (id, username, password_hash, image, provider, created_at)
-      VALUES (${user.id}, ${user.username}, ${user.passwordHash || null}, ${user.image || null}, ${user.provider}, ${user.createdAt})
+      INSERT INTO users (id, username, password_hash, image, provider, role, created_at)
+      VALUES (${user.id}, ${user.username}, ${user.passwordHash || null}, ${user.image || null}, ${user.provider}, ${role}, ${user.createdAt})
       ON CONFLICT (username) DO UPDATE SET
         password_hash = EXCLUDED.password_hash,
         image = EXCLUDED.image,
-        provider = EXCLUDED.provider
+        provider = EXCLUDED.provider,
+        role = CASE WHEN users.role = 'admin' THEN 'admin' ELSE EXCLUDED.role END
     `;
     return user;
   } catch (error) {
@@ -348,4 +367,45 @@ export async function getLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
       winRate: rounds ? Math.round((wins / rounds) * 1000) / 10 : 0,
     };
   });
+}
+
+export async function getAdminUsers(): Promise<AdminUserEntry[]> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    SELECT u.id, u.username, u.role,
+      COALESCE(w.balance, 100000) AS balance,
+      COALESCE(w.debt, 0) AS debt,
+      COUNT(g.id)::integer AS rounds,
+      COUNT(g.id) FILTER (WHERE g.won)::integer AS wins,
+      COUNT(g.id) FILTER (WHERE NOT g.won)::integer AS losses
+    FROM users u
+    LEFT JOIN user_wallets w ON w.user_id = u.id
+    LEFT JOIN game_rounds g ON g.user_id = u.id
+    GROUP BY u.id, u.username, u.role, w.balance, w.debt
+    ORDER BY COALESCE(w.balance, 100000) DESC, u.username ASC
+  `;
+  return (result.rows as Array<{ id: string; username: string; role: string; balance: string | number; debt: string | number; rounds: string | number; wins: string | number; losses: string | number }>).map((row) => ({
+    id: row.id,
+    username: row.username,
+    role: row.role === "admin" ? "admin" : "user",
+    balance: Number(row.balance),
+    debt: Number(row.debt),
+    rounds: Number(row.rounds),
+    wins: Number(row.wins),
+    losses: Number(row.losses),
+  }));
+}
+
+export async function adjustWalletBalance(userId: string, amount: number): Promise<StoredWallet> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    INSERT INTO user_wallets (user_id, balance)
+    VALUES (${userId}, GREATEST(0, 100000 + ${amount}))
+    ON CONFLICT (user_id) DO UPDATE
+      SET balance = user_wallets.balance + ${amount}, updated_at = CURRENT_TIMESTAMP
+      WHERE user_wallets.balance + ${amount} >= 0
+    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+  `;
+  if (!result.rows.length) throw new Error("BALANCE_WOULD_BE_NEGATIVE");
+  return mapWallet(result.rows[0] as WalletRow);
 }

@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       username,
       passwordHash: hashPassword(password),
       provider: "credentials" as const,
+      role: "user" as const,
       createdAt: new Date().toISOString(),
     };
 

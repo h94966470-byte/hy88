@@ -39,6 +39,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           name: user.username,
           username: user.username,
+          role: user.role,
         };
       },
     }),
@@ -53,19 +54,22 @@ export const authOptions: NextAuthOptions = {
           id?: string;
           username?: string;
           name?: string | null;
+          role?: "user" | "admin";
         };
         token.userId = authUser.id;
         token.username = authUser.username ?? authUser.name ?? "guest";
+        token.role = authUser.role ?? "user";
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         const dynamicSession = session as typeof session & {
-          user: { id?: string; username?: string };
+          user: { id?: string; username?: string; role?: "user" | "admin" };
         };
         dynamicSession.user.id = String(token.userId ?? "guest");
         dynamicSession.user.username = String(token.username ?? "guest");
+        dynamicSession.user.role = token.role === "admin" ? "admin" : "user";
       }
       return session;
     },
