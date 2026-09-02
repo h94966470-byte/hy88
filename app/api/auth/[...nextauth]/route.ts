@@ -15,5 +15,6 @@ export async function POST(req: NextRequest) {
 		}
 	}
 
-	return handler(req);
+	const nextauth = req.nextUrl.pathname.split("/").slice(3).filter(Boolean);
+	return handler(req, { params: Promise.resolve({ nextauth }) });
 }
