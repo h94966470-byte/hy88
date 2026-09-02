@@ -79,6 +79,15 @@ const getDeviceAccounts = (): string[] => {
   }
 };
 
+function SimulationDisclaimer() {
+  return (
+    <footer className="fixed bottom-3 right-3 z-40 w-[min(26rem,calc(100vw-1.5rem))] rounded-xl border border-amber-400/20 bg-slate-950/90 px-4 py-3 text-right text-[11px] leading-relaxed text-slate-400 shadow-lg backdrop-blur-md">
+      <p>Mọi thứ trên web này đều là giả lập, không quy đổi ra tiền mặt, không cổ xúy chơi cờ bạc, đỏ đen.</p>
+      <p className="mt-1 font-semibold text-amber-300">Hãy tránh xa cờ bạc.</p>
+    </footer>
+  );
+}
+
 const addDeviceAccount = (username: string) => {
   const accounts = getDeviceAccounts();
   if (!accounts.includes(username)) {
@@ -580,6 +589,7 @@ export default function HomePage() {
             </>
           )}
         </section>
+        <SimulationDisclaimer />
       </main>
     );
   }
@@ -657,6 +667,7 @@ export default function HomePage() {
 
         {message && <p className="mt-4 text-sm text-amber-300">{message}</p>}
       </div>
+      <SimulationDisclaimer />
     </main>
   );
 }
