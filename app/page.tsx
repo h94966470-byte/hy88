@@ -315,6 +315,12 @@ export default function HomePage() {
     router.refresh();
   };
 
+  const handleLogout = async () => {
+    setLoading(true);
+    const result = await signOut({ redirect: false, callbackUrl: "/" });
+    window.location.assign(result?.url || "/");
+  };
+
   if (isAuthenticated) {
     return (
       <main className="min-h-screen bg-slate-950 text-white">
@@ -342,10 +348,11 @@ export default function HomePage() {
               </span>
               <button
                 type="button"
-                onClick={() => signOut({ callbackUrl: "/" })}
+                onClick={() => void handleLogout()}
+                disabled={loading}
                 className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
               >
-                Đăng xuất
+                {loading ? "Đang đăng xuất..." : "Đăng xuất"}
               </button>
             </div>
           </div>
