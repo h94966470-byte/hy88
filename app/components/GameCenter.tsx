@@ -23,13 +23,6 @@ const TOTAL_MULTIPLIER = 8;
 
 type WagerMode = "tai-xiu" | "triple" | "pair" | "total" | "single";
 
-const secureRandomInt = (min: number, max: number) => {
-  const range = max - min + 1;
-  const values = new Uint32Array(1);
-  crypto.getRandomValues(values);
-  return min + (values[0] % range);
-};
-
 type RoundPoint = {
   result: "tai" | "xiu";
   playerChoice: "tai" | "xiu";
@@ -108,103 +101,55 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const targetResult = secureRandomInt(0, 1) === 0 ? "tai" : "xiu";
-    let dice1 = secureRandomInt(1, 6);
-    let dice2 = secureRandomInt(1, 6);
-    let dice3 = secureRandomInt(1, 6);
-    while ((dice1 + dice2 + dice3 > 10 ? "tai" : "xiu") !== targetResult) {
-      dice1 = secureRandomInt(1, 6);
-      dice2 = secureRandomInt(1, 6);
-      dice3 = secureRandomInt(1, 6);
-    }
-    const dice = [dice1, dice2, dice3];
-    const total = dice1 + dice2 + dice3;
-    const result = targetResult;
-    const triple = dice1 === dice2 && dice2 === dice3;
-    const selectedCount = dice.filter((die) => die === selectedNumber).length;
-
-    const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * INTEREST_RATE) : 0;
-    const taiXiuMultiplier = betType === "all" ? MULTIPLIER_ALL : betType === "half" ? MULTIPLIER_HALF : 1.0;
-    let won = false;
-    let multiplier = 0;
-    let wagerLabel = "";
-
-    if (wagerMode === "tai-xiu") {
-      won = !triple && result === choice;
-      multiplier = taiXiuMultiplier;
-      wagerLabel = choice === "tai" ? "Cửa Tài" : "Cửa Xỉu";
-    } else if (wagerMode === "triple") {
-      won = triple && dice1 === selectedNumber;
-      multiplier = TRIPLE_MULTIPLIER;
-      wagerLabel = `Bộ ba ${selectedNumber}`;
-    } else if (wagerMode === "pair") {
-      won = !triple && selectedCount === 2;
-      multiplier = PAIR_MULTIPLIER;
-      wagerLabel = `Cặp ${selectedNumber}`;
-    } else if (wagerMode === "total") {
-      won = total === selectedNumber;
-      multiplier = TOTAL_MULTIPLIER;
-      wagerLabel = `Tổng ${selectedNumber}`;
-    } else {
-      won = selectedCount > 0;
-      multiplier = selectedCount;
-      wagerLabel = `Số ${selectedNumber} (${selectedCount} lần)`;
-    }
-
-    const profit = won ? Math.floor(amount * multiplier) : -amount;
-    let newBalance = actualBalance + profit;
-    let newDebt = wallet.debt + interestDebt;
-
-    if (newBalance < 0) {
-      newDebt += Math.abs(newBalance);
-      newBalance = 0;
-    }
-
-    const newRound: RoundPoint = {
-      result,
-      playerChoice: choice ?? result,
-      won,
-      wagerMode,
-      selectedNumber: wagerMode === "tai-xiu" ? null : selectedNumber,
-      total,
-      dice,
-    };
     const gameResponse = await fetch("/api/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newRound, balanceDelta: newBalance - actualBalance, debtDelta: newDebt - wallet.debt }),
+      body: JSON.stringify({
+        amount,
+        betType,
+        wagerMode,
+        selectedNumber: wagerMode === "tai-xiu" ? null : selectedNumber,
+        playerChoice: choice ?? null,
+      }),
     });
-    const gameData = (await gameResponse.json()) as { wallet?: { balance: number; debt: number }; error?: string };
-    if (!gameResponse.ok || !gameData.wallet) {
+    const gameData = (await gameResponse.json()) as {
+      wallet?: { balance: number; debt: number };
+      round?: RoundPoint;
+      profit?: number;
+      interestDebt?: number;
+      error?: string;
+    };
+    if (!gameResponse.ok || !gameData.wallet || !gameData.round) {
       setRolling(false);
       setPlaying(false);
       setMessage(gameData.error || "Không thể lưu kết quả ván chơi. Vui lòng thử lại.");
       return;
     }
 
+    const dice = gameData.round.dice ?? [];
     await onWalletUpdate(gameData.wallet.balance, gameData.wallet.debt);
-    setRoundHistory((current) => [...current, newRound].slice(-30));
+    setRoundHistory((current) => [...current, gameData.round!].slice(-30));
     setTotalRounds((current) => current + 1);
 
     setGameResult({
       dice,
-      total,
-      result,
-      playerChoice: choice ?? result,
-      won,
-      triple,
-      profit,
-      wagerLabel,
+      total: gameData.round.total || 0,
+      result: gameData.round.result,
+      playerChoice: gameData.round.playerChoice,
+      won: gameData.round.won,
+      triple: dice[0] === dice[1] && dice[1] === dice[2],
+      profit: gameData.profit || 0,
+      wagerLabel: wagerMode === "tai-xiu" ? choice === "tai" ? "Cửa Tài" : "Cửa Xỉu" : `${wagerMode} ${selectedNumber}`,
       wagerMode,
     });
 
     setRolling(false);
     setMessage(
-      triple && wagerMode === "tai-xiu"
-        ? `Bộ ba đồng nhất: cả Tài và Xỉu đều thua. Bạn mất ${amount.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
-        : won
-          ? `Bạn thắng ${wagerLabel}! Lãi ${profit.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
-          : `Bạn thua ${wagerLabel}. Mất ${Math.abs(profit).toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
+      dice[0] === dice[1] && dice[1] === dice[2] && wagerMode === "tai-xiu"
+        ? `Bộ ba đồng nhất: cả Tài và Xỉu đều thua. Bạn mất ${amount.toLocaleString("vi-VN")} K`
+        : gameData.round.won
+          ? `Bạn thắng! Lãi ${Math.max(0, gameData.profit || 0).toLocaleString("vi-VN")} K`
+          : `Bạn thua. Mất ${amount.toLocaleString("vi-VN")} K`
     );
     setPlaying(false);
   };

@@ -344,6 +344,62 @@ export async function applyGameResult(
   return mapWallet(result.rows[0] as WalletRow);
 }
 
+export async function resolveGameRound(
+  userId: string,
+  amount: number,
+  betType: "custom" | "half" | "all",
+  wagerMode: StoredGameRound["wagerMode"],
+  selectedNumber: number | null,
+  playerChoice: "tai" | "xiu" | null,
+): Promise<{ wallet: StoredWallet; round: StoredGameRound; profit: number; interestDebt: number }> {
+  await ensureDatabaseReady();
+  const wallet = await getOrCreateWallet(userId);
+  const expectedAmount = betType === "all" ? wallet.balance : betType === "half" ? Math.floor(wallet.balance / 2) : amount;
+  if (!Number.isSafeInteger(expectedAmount) || expectedAmount <= 0 || expectedAmount > wallet.balance) {
+    throw new Error("INVALID_BET_AMOUNT");
+  }
+
+  const dice = [crypto.randomInt(1, 7), crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
+  const total = dice[0] + dice[1] + dice[2];
+  const result = total > 10 ? "tai" : "xiu";
+  const triple = dice[0] === dice[1] && dice[1] === dice[2];
+  const selectedCount = selectedNumber ? dice.filter((die) => die === selectedNumber).length : 0;
+  const taiXiuMultiplier = betType === "all" ? 2 : betType === "half" ? 1.5 : 1;
+  let won = false;
+  let multiplier = 0;
+
+  if (wagerMode === "tai-xiu") {
+    won = !triple && playerChoice === result;
+    multiplier = taiXiuMultiplier;
+  } else if (wagerMode === "triple") {
+    won = triple && dice[0] === selectedNumber;
+    multiplier = 150;
+  } else if (wagerMode === "pair") {
+    won = !triple && selectedCount === 2;
+    multiplier = 10;
+  } else if (wagerMode === "total") {
+    won = total === selectedNumber;
+    multiplier = 8;
+  } else {
+    won = selectedCount > 0;
+    multiplier = selectedCount;
+  }
+
+  const profit = won ? Math.floor(expectedAmount * multiplier) : -expectedAmount;
+  const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * 0.2) : 0;
+  let balanceDelta = profit;
+  let debtDelta = interestDebt;
+  let nextBalance = wallet.balance + balanceDelta;
+  if (nextBalance < 0) {
+    debtDelta += Math.abs(nextBalance);
+    balanceDelta = -wallet.balance;
+  }
+
+  const round: StoredGameRound = { result, playerChoice: playerChoice ?? result, won, wagerMode, selectedNumber, total, dice };
+  const nextWallet = await applyGameResult(userId, balanceDelta, debtDelta, round);
+  return { wallet: nextWallet, round, profit: won ? Math.floor(expectedAmount * multiplier) : -expectedAmount, interestDebt };
+}
+
 export async function getRecentGameRounds(limit = 30): Promise<StoredGameRound[]> {
   await ensureDatabaseReady();
   const result = await sql`
