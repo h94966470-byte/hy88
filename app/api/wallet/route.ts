@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { claimDailyWallet, claimNewbieWallet, getOrCreateWallet, StoredWallet, updateWallet } from "@/lib/store";
+import { borrowWallet, claimDailyWallet, claimNewbieWallet, getOrCreateWallet, StoredWallet, updateWallet } from "@/lib/store";
 
 const getUserId = async () => {
   const session = await getServerSession(authOptions);
@@ -61,6 +61,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json()) as { action?: string; dateKey?: string };
+    if (body.action === "borrow") {
+      return NextResponse.json({ wallet: await borrowWallet(userId) });
+    }
+
     if (!body.dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(body.dateKey)) {
       return NextResponse.json({ error: "Ngày không hợp lệ" }, { status: 400 });
     }

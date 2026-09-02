@@ -14,7 +14,12 @@ type GameResult = {
 const INTEREST_RATE = 0.2;
 const MULTIPLIER_ALL = 2.0;
 const MULTIPLIER_HALF = 1.5;
-const CAU_BASE = 100;
+
+type RoundPoint = {
+  result: "tai" | "xiu";
+  playerChoice: "tai" | "xiu";
+  won: boolean;
+};
 
 interface GameCenterProps {
   wallet: {
@@ -35,18 +40,27 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
   const [rolling, setRolling] = useState(false);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [message, setMessage] = useState("");
-  const [cau, setCau] = useState(CAU_BASE);
-  const [rounds, setRounds] = useState(0);
+  const [roundHistory, setRoundHistory] = useState<RoundPoint[]>([]);
 
   useEffect(() => {
-    if (!wallet) return;
-    const saved = localStorage.getItem(`hy88-cau-${wallet.balance}`);
-    if (saved) {
-      const data = JSON.parse(saved);
-      setCau(data.cau);
-      setRounds(data.rounds);
-    }
-  }, [wallet?.balance]);
+    let cancelled = false;
+    const loadRounds = async () => {
+      const response = await fetch("/api/games", { cache: "no-store" });
+      if (!cancelled && response.ok) {
+        const data = (await response.json()) as { rounds: RoundPoint[] };
+        setRoundHistory(data.rounds);
+      }
+    };
+
+    void loadRounds();
+    const refreshInterval = window.setInterval(() => {
+      if (!document.hidden) void loadRounds();
+    }, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(refreshInterval);
+    };
+  }, []);
 
   if (!wallet) return null;
 
@@ -75,37 +89,27 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     const total = dice1 + dice2;
     const result = total > 10 ? "tai" : "xiu";
 
-    let interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * INTEREST_RATE) : 0;
-    let won = result === choice;
-    let multiplier = betType === "all" ? MULTIPLIER_ALL : betType === "half" ? MULTIPLIER_HALF : 1.0;
+    const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * INTEREST_RATE) : 0;
+    const won = result === choice;
+    const multiplier = betType === "all" ? MULTIPLIER_ALL : betType === "half" ? MULTIPLIER_HALF : 1.0;
 
-    let profit = won ? Math.floor(amount * multiplier) : -amount;
+    const profit = won ? Math.floor(amount * multiplier) : -amount;
     let newBalance = actualBalance + profit;
     let newDebt = wallet.debt + interestDebt;
-    let newCau = cau;
 
     if (newBalance < 0) {
       newDebt += Math.abs(newBalance);
       newBalance = 0;
     }
 
-    if (won) {
-      newCau = CAU_BASE;
-    } else {
-      newCau += Math.floor(amount * 0.1);
-    }
-
     onWalletUpdate(newBalance, newDebt);
-    setCau(newCau);
-    setRounds(rounds + 1);
-
-    localStorage.setItem(
-      `hy88-cau-${newBalance}`,
-      JSON.stringify({
-        cau: newCau,
-        rounds: rounds + 1,
-      })
-    );
+    const newRound: RoundPoint = { result, playerChoice: choice, won };
+    setRoundHistory((current) => [...current, newRound].slice(-100));
+    void fetch("/api/games", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newRound),
+    });
 
     setGameResult({
       dice,
@@ -124,6 +128,23 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     );
     setPlaying(false);
   };
+
+  const chartPoints = roundHistory.map((round, index) => {
+    const x = roundHistory.length === 1 ? 50 : (index / (roundHistory.length - 1)) * 100;
+    const y = round.result === "tai" ? 22 : 78;
+    return `${x},${y}`;
+  });
+  const chartPath = chartPoints.length > 1
+    ? chartPoints.reduce((path, point, index) => {
+        if (index === 0) return `M ${point}`;
+        const [previousX, previousY] = chartPoints[index - 1].split(",");
+        const [currentX, currentY] = point.split(",");
+        const midpoint = (Number(previousX) + Number(currentX)) / 2;
+        return `${path} Q ${midpoint},${previousY} ${currentX},${currentY}`;
+      }, "")
+    : chartPoints.length === 1
+      ? `M 0,50 Q 50,${chartPoints[0].split(",")[1]} 100,50`
+      : "M 0,50 C 20,12 30,88 50,50 S 80,12 100,50";
 
   return (
     <div className="grid gap-8 md:grid-cols-3">
@@ -147,7 +168,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
               </div>
               <div>
                 <p className="text-xs text-blue-300 uppercase">Ván</p>
-                <p className="mt-1 text-2xl font-bold text-white">{rounds}</p>
+                <p className="mt-1 text-2xl font-bold text-white">{roundHistory.length}</p>
               </div>
             </div>
           </div>
@@ -268,36 +289,35 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
         </div>
       </div>
 
-      {/* Cau Display */}
+      {/* Shared round chart */}
       <div className="md:col-span-1">
         <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl h-full flex flex-col items-center justify-center text-center">
-          <p className="text-sm uppercase tracking-[0.24em] text-violet-300 mb-4">Cầu hiện tại</p>
+          <p className="text-sm uppercase tracking-[0.24em] text-violet-300 mb-4">Biểu đồ các ván</p>
 
-          <div className="relative w-full aspect-square flex items-center justify-center mb-6">
-            <div className="absolute inset-0 rounded-full border-4 border-violet-500/30 bg-violet-500/10"></div>
-            <div className="text-5xl font-bold text-violet-300">{(cau / 1000).toFixed(1)}K</div>
+          <div className="relative w-full aspect-square flex items-center justify-center mb-6 rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3">
+            <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" role="img" aria-label="Biểu đồ hình sin kết quả các ván">
+              <path d="M 0,50 H 100" stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 3" />
+              <path d={chartPath} fill="none" stroke="#c4b5fd" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+              {chartPoints.slice(-20).map((point, index) => {
+                const [x, y] = point.split(",");
+                return <circle key={`${point}-${index}`} cx={x} cy={y} r="1.6" fill="#fbbf24" />;
+              })}
+            </svg>
           </div>
 
           <div className="w-full space-y-2 text-sm">
             <div className="flex justify-between text-slate-400">
-              <span>Trạng thái</span>
-              <span className="text-violet-300 font-bold">{cau > 500 ? "CAO" : "TRUNG"}</span>
+              <span>Phạm vi</span>
+              <span className="text-violet-300 font-bold">Tất cả người chơi</span>
             </div>
             <div className="flex justify-between text-slate-400">
-              <span>Mức độ</span>
-              <div className="flex gap-1">
-                {[...Array(5)].map((_, i) => (
-                  <div
-                    key={i}
-                    className={`h-2 w-2 rounded-full ${i < Math.ceil((cau / 1000) * 5) ? "bg-violet-400" : "bg-slate-700"}`}
-                  ></div>
-                ))}
-              </div>
+              <span>Tổng số ván</span>
+              <span className="font-bold text-white">{roundHistory.length}</span>
             </div>
           </div>
 
           <p className="mt-6 text-xs text-slate-400">
-            +{Math.floor(50 * 0.1)}K mỗi ván thua | Đặt lại khi thắng
+            TÀI ở đỉnh, XỈU ở đáy | Cập nhật theo từng ván
           </p>
         </div>
       </div>

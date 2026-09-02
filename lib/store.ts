@@ -37,6 +37,12 @@ export type StoredWallet = {
   createdAt: string;
 };
 
+export type StoredGameRound = {
+  result: "tai" | "xiu";
+  playerChoice: "tai" | "xiu";
+  won: boolean;
+};
+
 export function hashPassword(value: string) {
   return crypto.createHash("sha256").update(value.trim()).digest("hex");
 }
@@ -217,4 +223,40 @@ export async function claimNewbieWallet(userId: string, dateKey: string): Promis
     RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   return result.rows.length ? mapWallet(result.rows[0] as WalletRow) : null;
+}
+
+export async function borrowWallet(userId: string): Promise<StoredWallet> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    UPDATE user_wallets
+    SET balance = balance + 100000,
+        debt = debt + 100000,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}
+    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+  `;
+  return mapWallet(result.rows[0] as WalletRow);
+}
+
+export async function createGameRound(userId: string, round: StoredGameRound): Promise<void> {
+  await ensureDatabaseReady();
+  await sql`
+    INSERT INTO game_rounds (id, user_id, result, player_choice, won)
+    VALUES (${crypto.randomUUID()}, ${userId}, ${round.result}, ${round.playerChoice}, ${round.won})
+  `;
+}
+
+export async function getRecentGameRounds(limit = 100): Promise<StoredGameRound[]> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    SELECT result, player_choice, won
+    FROM game_rounds
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `;
+  return (result.rows as Array<{ result: "tai" | "xiu"; player_choice: "tai" | "xiu"; won: boolean }>).reverse().map((row) => ({
+    result: row.result,
+    playerChoice: row.player_choice,
+    won: row.won,
+  }));
 }

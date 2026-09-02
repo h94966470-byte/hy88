@@ -56,6 +56,21 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_user_wallets_updated_at ON user_wallets(updated_at);
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS game_rounds (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        result VARCHAR(3) NOT NULL CHECK (result IN ('tai', 'xiu')),
+        player_choice VARCHAR(3) NOT NULL CHECK (player_choice IN ('tai', 'xiu')),
+        won BOOLEAN NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_game_rounds_created_at ON game_rounds(created_at DESC);
+    `;
+
     console.log("✅ Database initialized successfully");
   } catch (error) {
     console.error("❌ Database initialization error:", error);

@@ -180,6 +180,23 @@ export default function HomePage() {
 
   const handleDailyBonus = () => void claimBonus("daily");
 
+  const handleBorrow = async () => {
+    setLoading(true);
+    const res = await fetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "borrow" }),
+    });
+    const data = (await res.json()) as { wallet?: WalletState; error?: string };
+    setLoading(false);
+    if (!res.ok || !data.wallet) {
+      setMessage(data.error || "Không thể vay nợ");
+      return;
+    }
+    setWallet(data.wallet);
+    setMessage("Bạn đã vay 100.000 VND. Khoản nợ đã được cập nhật.");
+  };
+
   const handleNewUserDaily = () => {
     if (!wallet) return;
     const todayKey = formatDateKey(new Date());
@@ -320,11 +337,23 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={handleDailyBonus}
+                  disabled={loading}
                   className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-left transition hover:bg-amber-500/15"
                 >
                   <p className="text-sm text-amber-200">Daily</p>
                   <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
                   <p className="mt-2 text-sm text-slate-300">Nhận mỗi ngày, reset 00:00 ngày mai.</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleBorrow}
+                  disabled={loading}
+                  className="rounded-2xl border border-red-400/40 bg-red-500/10 p-5 text-left transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <p className="text-sm text-red-200">Vay nợ</p>
+                  <p className="mt-2 text-2xl font-bold text-white">+100.000 VND</p>
+                  <p className="mt-2 text-sm text-slate-300">Cộng vào số dư và khoản nợ hiện tại.</p>
                 </button>
 
                 <button
