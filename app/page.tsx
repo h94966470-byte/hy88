@@ -263,12 +263,6 @@ export default function HomePage() {
       return;
     }
 
-    const deviceAccounts = getDeviceAccounts();
-    if (deviceAccounts.length >= 3) {
-      setMessage("Thiết bị này đã tạo tối đa 3 tài khoản. Không thể tạo thêm.");
-      return;
-    }
-
     setLoading(true);
     setMessage("");
 
