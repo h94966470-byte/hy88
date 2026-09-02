@@ -15,6 +15,13 @@ const INTEREST_RATE = 0.2;
 const MULTIPLIER_ALL = 2.0;
 const MULTIPLIER_HALF = 1.5;
 
+const secureRandomInt = (min: number, max: number) => {
+  const range = max - min + 1;
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return min + (values[0] % range);
+};
+
 type RoundPoint = {
   result: "tai" | "xiu";
   playerChoice: "tai" | "xiu";
@@ -83,11 +90,16 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const dice1 = Math.floor(Math.random() * 6) + 1;
-    const dice2 = Math.floor(Math.random() * 6) + 1;
+    const targetResult = secureRandomInt(0, 1) === 0 ? "tai" : "xiu";
+    let dice1 = secureRandomInt(1, 6);
+    let dice2 = secureRandomInt(1, 6);
+    while ((dice1 + dice2 > 10 ? "tai" : "xiu") !== targetResult) {
+      dice1 = secureRandomInt(1, 6);
+      dice2 = secureRandomInt(1, 6);
+    }
     const dice = [dice1, dice2];
     const total = dice1 + dice2;
-    const result = total > 10 ? "tai" : "xiu";
+    const result = targetResult;
 
     const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * INTEREST_RATE) : 0;
     const won = result === choice;
