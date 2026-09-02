@@ -15,6 +15,10 @@ export async function POST(req: NextRequest) {
     const username = String(body?.username || "").trim();
     const password = String(body?.password || "").trim();
     const deviceId = String(body?.deviceId || "").trim();
+    const isConfiguredAdmin = Boolean(
+      process.env.ADMIN_USERNAME &&
+      process.env.ADMIN_USERNAME.toLowerCase() === username.toLowerCase(),
+    );
 
     if (!username || !password) {
       return NextResponse.json({ error: "Thiếu username hoặc mật khẩu" }, { status: 400 });
@@ -33,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Username đã tồn tại" }, { status: 409 });
     }
 
-    if (deviceId) {
+    if (deviceId && !isConfiguredAdmin) {
       const accountCount = await countAccountsByDeviceId(deviceId);
       if (accountCount >= 3) {
         return NextResponse.json({ error: "Thiết bị này đã tạo tối đa 3 tài khoản. Không thể tạo thêm." }, { status: 429 });
