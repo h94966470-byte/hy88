@@ -433,6 +433,46 @@ export default function HomePage() {
 
               {message && <p className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{message}</p>}
             </div>
+          ) : activeMenu === "Khuyến mãi" ? (
+            <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
+              <div className="mb-8">
+                <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Khuyến mãi</p>
+                <h1 className="mt-3 text-4xl font-bold text-white">Donate cho Admin</h1>
+              </div>
+
+              <div className="grid gap-8 lg:grid-cols-[minmax(280px,420px)_1fr] lg:items-center">
+                <div className="overflow-hidden rounded-2xl border border-cyan-400/40 bg-white p-4">
+                  <img
+                    src="/qr-zalopay.png"
+                    alt="Mã QR ZaloPay của Admin"
+                    className="aspect-square w-full object-contain"
+                  />
+                </div>
+
+                <div className="space-y-5">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">Ae có thể donate cho Admin qua QR này</h2>
+                    <p className="mt-2 text-slate-300">(không bắt buộc)</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
+                    <p className="text-lg font-semibold text-amber-200">Donate được khuyến mãi</p>
+                    <p className="mt-2 text-sm text-slate-300">Tiền ảo trên web được cộng theo các mốc sau:</p>
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between rounded-xl bg-slate-950/50 px-4 py-3 text-white">
+                        <span>5k</span><span className="font-bold text-emerald-300">500k tiền ảo</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl bg-slate-950/50 px-4 py-3 text-white">
+                        <span>10k</span><span className="font-bold text-emerald-300">1tr tiền ảo</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl bg-slate-950/50 px-4 py-3 text-white">
+                        <span>20k</span><span className="font-bold text-emerald-300">2tr tiền ảo</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : activeMenu === "Hỗ trợ" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
               <div className="mb-6">
@@ -487,7 +527,7 @@ export default function HomePage() {
                 <div className="mb-5 flex items-end justify-between gap-4">
                   <div>
                     <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Bảng xếp hạng</p>
-                    <h2 className="mt-2 text-2xl font-bold text-white">Top người chơi theo số tiền</h2>
+                    <h2 className="mt-2 text-2xl font-bold text-white">Top người chơi</h2>
                   </div>
                   <span className="text-xs text-slate-400">Cập nhật tự động</span>
                 </div>
