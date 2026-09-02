@@ -99,29 +99,38 @@ export default function HomePage() {
     }
 
     let cancelled = false;
-    const loadWallet = async () => {
-      setWalletLoading(true);
-      const res = await fetch("/api/wallet", { cache: "no-store" });
-      if (cancelled) return;
-      if (res.ok) {
-        const data = (await res.json()) as { wallet: WalletState };
-        setWallet(data.wallet);
-      } else {
-        setMessage("Không thể tải số dư tài khoản.");
+    const loadWallet = async (showLoading = false) => {
+      if (showLoading) setWalletLoading(true);
+
+      try {
+        const res = await fetch("/api/wallet", { cache: "no-store" });
+        if (cancelled) return;
+        if (res.ok) {
+          const data = (await res.json()) as { wallet: WalletState };
+          setWallet(data.wallet);
+        } else if (showLoading) {
+          setMessage("Không thể tải số dư tài khoản.");
+        }
+      } catch {
+        if (showLoading && !cancelled) {
+          setMessage("Không thể tải số dư tài khoản.");
+        }
+      } finally {
+        if (showLoading && !cancelled) setWalletLoading(false);
       }
-      setWalletLoading(false);
     };
 
-    void loadWallet();
+    void loadWallet(true);
     const refreshInterval = window.setInterval(() => {
       if (!document.hidden) void loadWallet();
     }, 5000);
-    window.addEventListener("focus", loadWallet);
+    const handleWindowFocus = () => void loadWallet();
+    window.addEventListener("focus", handleWindowFocus);
 
     return () => {
       cancelled = true;
       window.clearInterval(refreshInterval);
-      window.removeEventListener("focus", loadWallet);
+      window.removeEventListener("focus", handleWindowFocus);
     };
   }, [isAuthenticated]);
 
