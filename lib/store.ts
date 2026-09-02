@@ -115,6 +115,27 @@ export async function setCustomSuccessRate(customRate: number | null): Promise<A
   return { customRate: savedRate === null || savedRate === undefined ? null : Number(savedRate) };
 }
 
+export function getFinalWinRate(
+  customWinRate: number | null,
+  balance: number,
+  winStreak: number,
+  lossStreak: number,
+): number {
+  if (customWinRate !== null) {
+    if (!Number.isFinite(customWinRate) || customWinRate < 0 || customWinRate > 1) {
+      throw new Error("INVALID_CUSTOM_RATE");
+    }
+    return customWinRate;
+  }
+
+  let automaticRate = 0.5;
+  if (balance < 500000) automaticRate += 0.05;
+  if (balance > 5000000) automaticRate -= 0.05;
+  if (lossStreak >= 3) automaticRate += Math.min((lossStreak - 2) * 0.02, 0.15);
+  if (winStreak >= 3) automaticRate -= Math.min((winStreak - 2) * 0.02, 0.15);
+  return Math.min(0.9, Math.max(0.1, automaticRate));
+}
+
 export async function readUsers(): Promise<StoredUser[]> {
   try {
     await ensureDatabaseReady();
@@ -263,16 +284,12 @@ export async function resolveDiceBet(userId: string, betAmount: number): Promise
   }
 
   const { customRate } = await getAppSettings();
-  let winRate = customRate === null ? 0.5 : customRate;
-  if (customRate === null) {
-    if (wallet.balance < 500000) winRate += 0.05;
-    if (wallet.balance > 5000000) winRate -= 0.05;
-    if (wallet.lossStreak >= 3) winRate += Math.min((wallet.lossStreak - 2) * 0.02, 0.15);
-    if (wallet.winStreak >= 3) winRate -= Math.min((wallet.winStreak - 2) * 0.02, 0.15);
-  }
-  winRate = Math.min(0.9, Math.max(0.1, winRate));
-
-  const isWin = crypto.randomInt(0, 10000) < Math.floor(winRate * 10000);
+  const winRate = getFinalWinRate(customRate, wallet.balance, wallet.winStreak, wallet.lossStreak);
+  const isWin = customRate === 0
+    ? false
+    : customRate === 1
+      ? true
+      : crypto.randomInt(0, 10000) < Math.floor(winRate * 10000);
   const balanceDelta = isWin ? betAmount : -betAmount;
   const dice = [crypto.randomInt(1, 7), crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
   const total = dice[0] + dice[1] + dice[2];
