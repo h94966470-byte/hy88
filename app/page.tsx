@@ -3,7 +3,7 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import TaiXiuGame from "./components/TaiXiuGame";
+import GameCenter from "./components/GameCenter";
 
 const menuItems = ["Trang chủ", "Sòng bạc", "Ví", "Khuyến mãi", "Hỗ trợ"];
 const supportLinks = [
@@ -26,6 +26,7 @@ const supportLinks = [
 
 type WalletState = {
   balance: number;
+  debt: number;
   dailyClaimDate: string | null;
   newbieStep: number;
   newbieDailyClaimDate: string | null;
@@ -81,6 +82,7 @@ const addDeviceAccount = (username: string) => {
 
 const createDefaultWallet = (): WalletState => ({
   balance: 100000,
+  debt: 0,
   dailyClaimDate: null,
   newbieStep: 0,
   newbieDailyClaimDate: null,
@@ -121,6 +123,7 @@ export default function HomePage() {
       const parsed = JSON.parse(saved) as WalletState;
       const normalized: WalletState = {
         balance: Number(parsed.balance) || 100000,
+        debt: Number(parsed.debt) || 0,
         dailyClaimDate: parsed.dailyClaimDate || null,
         newbieDailyClaimDate: parsed.newbieDailyClaimDate || null,
         newbieStep: Number(parsed.newbieStep) || 0,
@@ -141,11 +144,12 @@ export default function HomePage() {
     setWallet(nextWallet);
   };
 
-  const handleGameWalletUpdate = (newBalance: number) => {
+  const handleGameWalletUpdate = (newBalance: number, newDebt: number) => {
     if (!wallet) return;
     const nextWallet = {
       ...wallet,
       balance: newBalance,
+      debt: newDebt,
     };
     persistWallet(nextWallet);
   };
@@ -297,14 +301,20 @@ export default function HomePage() {
 
         <section className="mx-auto max-w-6xl px-6 py-10">
           {activeMenu === "Sòng bạc" ? (
-            <TaiXiuGame wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
+            <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
           ) : activeMenu === "Ví" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
                 <div>
                   <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Ví tiền</p>
                   <h1 className="mt-2 text-4xl font-bold text-white">{wallet ? `${wallet.balance.toLocaleString("vi-VN")} VND` : "0 VND"}</h1>
                 </div>
+                {wallet && wallet.debt > 0 && (
+                  <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-6 py-4">
+                    <p className="text-sm text-red-300">No</p>
+                    <p className="mt-2 text-2xl font-bold text-red-200">{wallet.debt.toLocaleString("vi-VN")} VND</p>
+                  </div>
+                )}
               </div>
 
               <div className="mt-8 grid gap-5 md:grid-cols-2">
