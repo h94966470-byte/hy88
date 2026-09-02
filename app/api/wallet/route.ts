@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { getOrCreateWallet, StoredWallet, updateWallet } from "@/lib/store";
+import { claimDailyWallet, claimNewbieWallet, getOrCreateWallet, StoredWallet, updateWallet } from "@/lib/store";
 
 const getUserId = async () => {
   const session = await getServerSession(authOptions);
@@ -50,5 +50,34 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error("Update wallet error:", error);
     return NextResponse.json({ error: "Không thể cập nhật số dư" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId || userId === "guest") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = (await req.json()) as { action?: string; dateKey?: string };
+    if (!body.dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(body.dateKey)) {
+      return NextResponse.json({ error: "Ngày không hợp lệ" }, { status: 400 });
+    }
+
+    const wallet = body.action === "daily"
+      ? await claimDailyWallet(userId, body.dateKey)
+      : body.action === "newbie"
+        ? await claimNewbieWallet(userId, body.dateKey)
+        : null;
+
+    if (!wallet) {
+      return NextResponse.json({ error: "Daily đã được nhận hôm nay hoặc không còn hiệu lực" }, { status: 409 });
+    }
+
+    return NextResponse.json({ wallet });
+  } catch (error) {
+    console.error("Claim wallet bonus error:", error);
+    return NextResponse.json({ error: "Không thể đồng bộ dữ liệu" }, { status: 500 });
   }
 }

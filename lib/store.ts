@@ -184,3 +184,37 @@ export async function updateWallet(userId: string, wallet: StoredWallet): Promis
   `;
   return mapWallet(result.rows[0] as WalletRow);
 }
+
+export async function claimDailyWallet(userId: string, dateKey: string): Promise<StoredWallet | null> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    UPDATE user_wallets
+    SET balance = balance + 50000,
+        daily_claim_date = ${dateKey},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}
+      AND (daily_claim_date IS NULL OR daily_claim_date <> ${dateKey})
+    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+  `;
+  return result.rows.length ? mapWallet(result.rows[0] as WalletRow) : null;
+}
+
+export async function claimNewbieWallet(userId: string, dateKey: string): Promise<StoredWallet | null> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    UPDATE user_wallets
+    SET balance = balance + CASE newbie_step
+      WHEN 0 THEN 300000
+      WHEN 1 THEN 200000
+      ELSE 100000
+    END,
+        newbie_step = newbie_step + 1,
+        newbie_daily_claim_date = ${dateKey},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}
+      AND newbie_step < 7
+      AND (newbie_daily_claim_date IS NULL OR newbie_daily_claim_date <> ${dateKey})
+    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+  `;
+  return result.rows.length ? mapWallet(result.rows[0] as WalletRow) : null;
+}

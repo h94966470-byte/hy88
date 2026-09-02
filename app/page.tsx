@@ -113,7 +113,9 @@ export default function HomePage() {
     };
 
     void loadWallet();
-    const refreshInterval = window.setInterval(() => void loadWallet(), 5000);
+    const refreshInterval = window.setInterval(() => {
+      if (!document.hidden) void loadWallet();
+    }, 5000);
     window.addEventListener("focus", loadWallet);
 
     return () => {
@@ -148,31 +150,32 @@ export default function HomePage() {
     void persistWallet(nextWallet);
   };
 
-  const handleDailyBonus = () => {
+  const claimBonus = async (action: "daily" | "newbie") => {
     if (!wallet) return;
     const todayKey = formatDateKey(new Date());
-
-    if (wallet.dailyClaimDate === todayKey) {
-      setMessage("Bạn đã nhận Daily hôm nay rồi.");
+    setLoading(true);
+    const res = await fetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, dateKey: todayKey }),
+    });
+    const data = (await res.json()) as { wallet?: WalletState; error?: string };
+    setLoading(false);
+    if (!res.ok || !data.wallet) {
+      setMessage(data.error || "Không thể đồng bộ dữ liệu");
       return;
     }
-
-    const nextWallet = {
-      ...wallet,
-      balance: wallet.balance + 50000,
-      dailyClaimDate: todayKey,
-    };
-
-    void persistWallet(nextWallet);
-    setMessage("Bạn đã nhận 50.000 VND từ Daily.");
+    setWallet(data.wallet);
+    setMessage(action === "daily" ? "Bạn đã nhận 50.000 VND từ Daily." : "Bạn đã nhận Daily người mới.");
   };
+
+  const handleDailyBonus = () => void claimBonus("daily");
 
   const handleNewUserDaily = () => {
     if (!wallet) return;
-    const newbieRewards = [300000, 200000, 100000, 100000, 100000, 100000, 100000];
     const todayKey = formatDateKey(new Date());
 
-    if (wallet.newbieStep >= newbieRewards.length) {
+    if (wallet.newbieStep >= 7) {
       setMessage("Nút Daily người mới đã hết hiệu lực.");
       return;
     }
@@ -182,16 +185,7 @@ export default function HomePage() {
       return;
     }
 
-    const reward = newbieRewards[wallet.newbieStep];
-    const nextWallet = {
-      ...wallet,
-      balance: wallet.balance + reward,
-      newbieStep: wallet.newbieStep + 1,
-      newbieDailyClaimDate: todayKey,
-    };
-
-    void persistWallet(nextWallet);
-    setMessage(`Bạn nhận ${reward.toLocaleString("vi-VN")} VND từ Daily người mới.`);
+    void claimBonus("newbie");
   };
 
   const handleSignup = async () => {
