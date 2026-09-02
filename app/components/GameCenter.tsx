@@ -102,21 +102,22 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       newBalance = 0;
     }
 
-    const walletSaved = await onWalletUpdate(newBalance, newDebt);
-    if (!walletSaved) {
+    const newRound: RoundPoint = { result, playerChoice: choice, won };
+    const gameResponse = await fetch("/api/games", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...newRound, balanceDelta: newBalance - actualBalance, debtDelta: newDebt - wallet.debt }),
+    });
+    const gameData = (await gameResponse.json()) as { wallet?: { balance: number; debt: number }; error?: string };
+    if (!gameResponse.ok || !gameData.wallet) {
       setRolling(false);
       setPlaying(false);
-      setMessage("Không thể lưu kết quả ván chơi. Vui lòng thử lại.");
+      setMessage(gameData.error || "Không thể lưu kết quả ván chơi. Vui lòng thử lại.");
       return;
     }
 
-    const newRound: RoundPoint = { result, playerChoice: choice, won };
+    await onWalletUpdate(gameData.wallet.balance, gameData.wallet.debt);
     setRoundHistory((current) => [...current, newRound].slice(-100));
-    await fetch("/api/games", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newRound),
-    });
 
     setGameResult({
       dice,

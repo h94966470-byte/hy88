@@ -250,6 +250,32 @@ export async function createGameRound(userId: string, round: StoredGameRound): P
   `;
 }
 
+export async function applyGameResult(
+  userId: string,
+  balanceDelta: number,
+  debtDelta: number,
+  round: StoredGameRound,
+): Promise<StoredWallet> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    UPDATE user_wallets
+    SET balance = balance + ${balanceDelta},
+        debt = debt + ${debtDelta},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}
+      AND balance + ${balanceDelta} >= 0
+      AND debt + ${debtDelta} >= 0
+    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+  `;
+
+  if (!result.rows.length) {
+    throw new Error("GAME_WALLET_UPDATE_FAILED");
+  }
+
+  await createGameRound(userId, round);
+  return mapWallet(result.rows[0] as WalletRow);
+}
+
 export async function getRecentGameRounds(limit = 100): Promise<StoredGameRound[]> {
   await ensureDatabaseReady();
   const result = await sql`

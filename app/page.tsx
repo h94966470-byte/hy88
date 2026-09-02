@@ -134,35 +134,10 @@ export default function HomePage() {
     };
   }, [isAuthenticated]);
 
-  const persistWallet = async (nextWallet: WalletState): Promise<boolean> => {
-    if (!isAuthenticated) return false;
-    try {
-      const res = await fetch("/api/wallet", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nextWallet),
-      });
-      if (!res.ok) {
-        setMessage("Không thể đồng bộ số dư. Vui lòng thử lại.");
-        return false;
-      }
-      const data = (await res.json()) as { wallet: WalletState };
-      setWallet(data.wallet);
-      return true;
-    } catch {
-      setMessage("Không thể đồng bộ số dư. Vui lòng thử lại.");
-      return false;
-    }
-  };
-
-  const handleGameWalletUpdate = async (newBalance: number, newDebt: number): Promise<boolean> => {
-    if (!wallet) return false;
-    const nextWallet = {
-      ...wallet,
-      balance: newBalance,
-      debt: newDebt,
-    };
-    return persistWallet(nextWallet);
+  const handleGameWalletUpdate = (newBalance: number, newDebt: number): Promise<boolean> => {
+    if (!wallet) return Promise.resolve(false);
+    setWallet((current) => current ? { ...current, balance: newBalance, debt: newDebt } : current);
+    return Promise.resolve(true);
   };
 
   const claimBonus = async (action: "daily" | "newbie") => {
