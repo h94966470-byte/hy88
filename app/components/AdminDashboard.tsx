@@ -113,8 +113,8 @@ export default function AdminDashboard() {
   const formatRate = (count: number, total: number) => total ? `${((count / total) * 100).toFixed(1)}%` : "0%";
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-8">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-screen w-full bg-slate-950 px-2 py-8 text-white sm:px-4 lg:px-6">
+      <div className="w-full max-w-none">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm uppercase tracking-[0.24em] text-amber-300">HY88 Admin</p>
@@ -148,13 +148,14 @@ export default function AdminDashboard() {
           <table className="w-full min-w-[1320px] text-left text-sm">
             <thead className="border-b border-white/10 text-xs uppercase tracking-[0.12em] text-slate-400">
               <tr>
+                <th className="px-4 py-4">Tài khoản</th>
                 <th className="px-4 py-4 text-right">Số dư</th>
                 <th className="px-4 py-4 text-right">Nợ</th>
                 <th className="px-4 py-4 text-right">Ván</th>
                 <th className="px-4 py-4 text-right">Thắng</th>
                 <th className="px-4 py-4 text-right">Thua</th>
-                <th className="px-4 py-4">Số dư</th>
-                <th className="px-4 py-4">Nợ</th>
+                <th className="px-4 py-4">Điều chỉnh số dư</th>
+                <th className="px-4 py-4">Điều chỉnh nợ</th>
                 <th className="px-4 py-4">Trạng thái</th>
               </tr>
             </thead>
