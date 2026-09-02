@@ -9,6 +9,7 @@ type GameResult = {
   playerChoice: string | null;
   won: boolean;
   profit: number;
+  triple: boolean;
 };
 
 const INTEREST_RATE = 0.2;
@@ -102,9 +103,10 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     const dice = [dice1, dice2, dice3];
     const total = dice1 + dice2 + dice3;
     const result = targetResult;
+    const triple = dice1 === dice2 && dice2 === dice3;
 
     const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * INTEREST_RATE) : 0;
-    const won = result === choice;
+    const won = !triple && result === choice;
     const multiplier = betType === "all" ? MULTIPLIER_ALL : betType === "half" ? MULTIPLIER_HALF : 1.0;
 
     const profit = won ? Math.floor(amount * multiplier) : -amount;
@@ -139,14 +141,17 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       result,
       playerChoice: choice,
       won,
+      triple,
       profit,
     });
 
     setRolling(false);
     setMessage(
-      won
-        ? `Bạn thắng! Lãi ${profit.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
-        : `Bạn thua ${Math.abs(profit).toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
+      triple
+        ? `Bộ ba đồng nhất: cả Tài và Xỉu đều thua. Bạn mất ${amount.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
+        : won
+          ? `Bạn thắng! Lãi ${profit.toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
+          : `Bạn thua ${Math.abs(profit).toLocaleString("vi-VN")} K${interestDebt > 0 ? ` (Lãi nợ: ${interestDebt})` : ""}`
     );
     setPlaying(false);
   };
@@ -283,7 +288,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 className={`rounded-2xl border p-6 ${gameResult.won ? "border-emerald-500/50 bg-emerald-500/20" : "border-red-500/50 bg-red-500/20"}`}
               >
                 <p className={`text-lg font-bold ${gameResult.won ? "text-emerald-200" : "text-red-200"}`}>
-                  {gameResult.won ? "THẮNG" : "THUA"}
+                  {gameResult.triple ? "BỘ BA ĐỒNG NHẤT - THUA" : gameResult.won ? "THẮNG" : "THUA"}
                 </p>
                 <p className={`text-3xl font-bold mt-2 ${gameResult.won ? "text-emerald-300" : "text-red-300"}`}>
                   {gameResult.won ? "+" : "-"}{Math.abs(gameResult.profit).toLocaleString("vi-VN")} K
