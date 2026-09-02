@@ -99,3 +99,30 @@ export async function createUser(user: StoredUser): Promise<StoredUser> {
     throw error;
   }
 }
+
+export async function countAccountsByDeviceId(deviceId: string): Promise<number> {
+  try {
+    await ensureDatabaseReady();
+    const result = await sql`
+      SELECT COUNT(*) as count FROM device_accounts
+      WHERE device_id = ${deviceId}
+    `;
+    return parseInt(result.rows[0]?.count ?? "0", 10);
+  } catch (error) {
+    console.error("❌ countAccountsByDeviceId error:", error);
+    return 0;
+  }
+}
+
+export async function addDeviceAccount(deviceId: string, username: string): Promise<void> {
+  try {
+    await ensureDatabaseReady();
+    const id = crypto.randomUUID();
+    await sql`
+      INSERT INTO device_accounts (id, device_id, username, created_at)
+      VALUES (${id}, ${deviceId}, ${username}, ${new Date().toISOString()})
+    `;
+  } catch (error) {
+    console.error("❌ addDeviceAccount error:", error);
+  }
+}

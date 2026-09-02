@@ -3,6 +3,7 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import TaiXiuGame from "./components/TaiXiuGame";
 
 const menuItems = ["Trang chủ", "Sòng bạc", "Ví", "Khuyến mãi", "Hỗ trợ"];
 const supportLinks = [
@@ -39,6 +40,44 @@ const formatDateKey = (date: Date) => {
 };
 
 const getWalletStorageKey = (username?: string | null) => `hy88-wallet-${username || "guest"}`;
+
+const generateDeviceId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
+const getDeviceIdStorageKey = () => "hy88-device-id";
+
+const getOrCreateDeviceId = (): string => {
+  try {
+    let deviceId = localStorage.getItem(getDeviceIdStorageKey());
+    if (!deviceId) {
+      deviceId = generateDeviceId();
+      localStorage.setItem(getDeviceIdStorageKey(), deviceId);
+    }
+    return deviceId;
+  } catch {
+    return generateDeviceId();
+  }
+};
+
+const getDeviceAccountsStorageKey = () => "hy88-device-accounts";
+
+const getDeviceAccounts = (): string[] => {
+  try {
+    const stored = localStorage.getItem(getDeviceAccountsStorageKey());
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const addDeviceAccount = (username: string) => {
+  const accounts = getDeviceAccounts();
+  if (!accounts.includes(username)) {
+    accounts.push(username);
+    localStorage.setItem(getDeviceAccountsStorageKey(), JSON.stringify(accounts));
+  }
+};
 
 const createDefaultWallet = (): WalletState => ({
   balance: 100000,
@@ -102,6 +141,15 @@ export default function HomePage() {
     setWallet(nextWallet);
   };
 
+  const handleGameWalletUpdate = (newBalance: number) => {
+    if (!wallet) return;
+    const nextWallet = {
+      ...wallet,
+      balance: newBalance,
+    };
+    persistWallet(nextWallet);
+  };
+
   const handleDailyBonus = () => {
     if (!wallet) return;
     const todayKey = formatDateKey(new Date());
@@ -159,13 +207,20 @@ export default function HomePage() {
       return;
     }
 
+    const deviceAccounts = getDeviceAccounts();
+    if (deviceAccounts.length >= 3) {
+      setMessage("Thiết bị này đã tạo tối đa 3 tài khoản. Không thể tạo thêm.");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
+    const deviceId = getOrCreateDeviceId();
     const res = await fetch("/api/auth/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, deviceId }),
     });
 
     const data = await res.json();
@@ -176,6 +231,7 @@ export default function HomePage() {
       return;
     }
 
+    addDeviceAccount(username);
     setMessage("Đăng ký thành công. Bạn có thể đăng nhập ngay.");
     setMode("login");
     setUsername("");
@@ -240,7 +296,9 @@ export default function HomePage() {
         </header>
 
         <section className="mx-auto max-w-6xl px-6 py-10">
-          {activeMenu === "Ví" ? (
+          {activeMenu === "Sòng bạc" ? (
+            <TaiXiuGame wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
+          ) : activeMenu === "Ví" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>

@@ -26,6 +26,19 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS device_accounts (
+        id UUID PRIMARY KEY,
+        device_id VARCHAR(255) NOT NULL,
+        username VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_device_accounts_device_id ON device_accounts(device_id);
+    `;
+
     console.log("✅ Database initialized successfully");
   } catch (error) {
     console.error("❌ Database initialization error:", error);

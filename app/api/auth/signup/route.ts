@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { createUser, findUserByUsername, hashPassword } from "@/lib/store";
+import { createUser, findUserByUsername, hashPassword, countAccountsByDeviceId, addDeviceAccount } from "@/lib/store";
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
     const body = rawBody ? JSON.parse(rawBody) : {};
     const username = String(body?.username || "").trim();
     const password = String(body?.password || "").trim();
+    const deviceId = String(body?.deviceId || "").trim();
 
     if (!username || !password) {
       return NextResponse.json({ error: "Thiếu username hoặc mật khẩu" }, { status: 400 });
@@ -26,6 +27,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Username đã tồn tại" }, { status: 409 });
     }
 
+    if (deviceId) {
+      const accountCount = await countAccountsByDeviceId(deviceId);
+      if (accountCount >= 3) {
+        return NextResponse.json({ error: "Thiết bị này đã tạo tối đa 3 tài khoản. Không thể tạo thêm." }, { status: 429 });
+      }
+    }
+
     const user = {
       id: crypto.randomUUID(),
       username,
@@ -35,6 +43,10 @@ export async function POST(req: NextRequest) {
     };
 
     await createUser(user);
+    
+    if (deviceId) {
+      await addDeviceAccount(deviceId, username);
+    }
 
     return NextResponse.json({ ok: true, user: { id: user.id, username: user.username } });
   } catch (error) {
