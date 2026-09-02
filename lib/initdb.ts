@@ -1,6 +1,15 @@
 import { sql } from "@vercel/postgres";
 
+const dbConnectionHint =
+  "Database chưa được cấu hình. Hãy thêm biến môi trường POSTGRES_URL hoặc DATABASE_URL trong Vercel hoặc .env.local.";
+
 export async function initializeDatabase() {
+  const connectionString = process.env.POSTGRES_URL ?? process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    throw new Error(dbConnectionHint);
+  }
+
   try {
     await sql`
       CREATE TABLE IF NOT EXISTS users (

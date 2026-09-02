@@ -10,6 +10,15 @@ async function ensureDatabaseReady() {
   }
 }
 
+type UserRow = {
+  id: string;
+  username: string;
+  password_hash?: string | null;
+  image?: string | null;
+  provider: string;
+  created_at: string | null;
+};
+
 export type StoredUser = {
   id: string;
   username: string;
@@ -27,13 +36,15 @@ export async function readUsers(): Promise<StoredUser[]> {
   try {
     await ensureDatabaseReady();
     const result = await sql`SELECT * FROM users`;
-    return result.rows.map((row: any) => ({
+    const rows = result.rows as UserRow[];
+
+    return rows.map((row) => ({
       id: row.id,
       username: row.username,
-      passwordHash: row.password_hash,
-      image: row.image,
-      provider: row.provider,
-      createdAt: row.created_at,
+      passwordHash: row.password_hash ?? undefined,
+      image: row.image ?? undefined,
+      provider: row.provider as "credentials",
+      createdAt: row.created_at ?? new Date().toISOString(),
     }));
   } catch (error) {
     console.error("❌ readUsers error:", error);
@@ -41,7 +52,7 @@ export async function readUsers(): Promise<StoredUser[]> {
   }
 }
 
-export async function writeUsers(users: StoredUser[]) {
+export async function writeUsers(_users: StoredUser[]) {
   console.warn("⚠️ writeUsers is deprecated for PostgreSQL. Use createUser instead.");
 }
 
@@ -56,14 +67,14 @@ export async function findUserByUsername(username: string): Promise<StoredUser |
 
     if (result.rows.length === 0) return null;
 
-    const row = result.rows[0];
+    const row = result.rows[0] as UserRow;
     return {
       id: row.id,
       username: row.username,
-      passwordHash: row.password_hash,
-      image: row.image,
-      provider: row.provider,
-      createdAt: row.created_at,
+      passwordHash: row.password_hash ?? undefined,
+      image: row.image ?? undefined,
+      provider: row.provider as "credentials",
+      createdAt: row.created_at ?? new Date().toISOString(),
     };
   } catch (error) {
     console.error("❌ findUserByUsername error:", error);

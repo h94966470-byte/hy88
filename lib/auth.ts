@@ -2,8 +2,10 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { findUserByUsername, hashPassword } from "@/lib/store";
 
+const nextAuthSecret = process.env.NEXTAUTH_SECRET ?? "dev-nextauth-secret-change-me";
+
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: nextAuthSecret,
   session: {
     strategy: "jwt",
   },

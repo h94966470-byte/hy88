@@ -4,9 +4,10 @@ import { createUser, findUserByUsername, hashPassword } from "@/lib/store";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const username = String(body.username || "").trim();
-    const password = String(body.password || "").trim();
+    const rawBody = await req.text();
+    const body = rawBody ? JSON.parse(rawBody) : {};
+    const username = String(body?.username || "").trim();
+    const password = String(body?.password || "").trim();
 
     if (!username || !password) {
       return NextResponse.json({ error: "Thiếu username hoặc mật khẩu" }, { status: 400 });
@@ -37,9 +38,15 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, user: { id: user.id, username: user.username } });
   } catch (error) {
+    console.error("Signup error:", error);
+
     const message =
-      error instanceof Error && error.message.includes("missing_connection_string")
-        ? "Database chưa được cấu hình. Hãy thêm biến môi trường POSTGRES_URL trong Vercel hoặc .env.local."
+      error instanceof Error &&
+      (error.message.includes("missing_connection_string") ||
+        error.message.includes("Database chưa được cấu hình") ||
+        error.message.includes("ECONNREFUSED") ||
+        error.message.includes("connect"))
+        ? "Database chưa được cấu hình. Hãy thêm biến môi trường POSTGRES_URL hoặc DATABASE_URL trong Vercel hoặc .env.local."
         : "Đăng ký thất bại vì lỗi server.";
 
     return NextResponse.json({ error: message }, { status: 500 });
