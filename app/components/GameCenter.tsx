@@ -93,12 +93,14 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     const targetResult = secureRandomInt(0, 1) === 0 ? "tai" : "xiu";
     let dice1 = secureRandomInt(1, 6);
     let dice2 = secureRandomInt(1, 6);
-    while ((dice1 + dice2 > 10 ? "tai" : "xiu") !== targetResult) {
+    let dice3 = secureRandomInt(1, 6);
+    while ((dice1 + dice2 + dice3 > 10 ? "tai" : "xiu") !== targetResult) {
       dice1 = secureRandomInt(1, 6);
       dice2 = secureRandomInt(1, 6);
+      dice3 = secureRandomInt(1, 6);
     }
-    const dice = [dice1, dice2];
-    const total = dice1 + dice2;
+    const dice = [dice1, dice2, dice3];
+    const total = dice1 + dice2 + dice3;
     const result = targetResult;
 
     const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * INTEREST_RATE) : 0;
@@ -243,7 +245,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   disabled={rolling || !betAmount && betType === "custom"}
                   className="rounded-2xl border border-red-400/40 bg-red-500/10 px-6 py-4 font-bold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
                 >
-                  TAI (&gt;10)
+                  TÀI (&gt;10)
                 </button>
                 <button
                   onClick={() => {
@@ -253,7 +255,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   disabled={rolling || !betAmount && betType === "custom"}
                   className="rounded-2xl border border-blue-400/40 bg-blue-500/10 px-6 py-4 font-bold text-blue-200 transition hover:bg-blue-500/20 disabled:opacity-50"
                 >
-                  XIU (&lt;=10)
+                  XỈU (&lt;=10)
                 </button>
               </div>
             </div>
@@ -270,7 +272,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
             <div className="text-center space-y-6">
               <div className="rounded-2xl border border-amber-500/50 bg-amber-500/20 p-6">
                 <p className="text-3xl font-bold">
-                  {gameResult.dice[0]} + {gameResult.dice[1]} = {gameResult.total}
+                  {gameResult.dice[0]} + {gameResult.dice[1]} + {gameResult.dice[2]} = {gameResult.total}
                 </p>
                 <p className="mt-2 text-sm text-slate-300">
                   Kết quả: {gameResult.result === "tai" ? "TÀI" : "XỈU"}
