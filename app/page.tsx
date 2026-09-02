@@ -135,36 +135,40 @@ export default function HomePage() {
                 <h1 className="mt-3 text-4xl font-bold text-white">Hỗ trợ khách hàng</h1>
               </div>
 
-              <div className="grid gap-5 md:grid-cols-3">
-                <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
-                  <p className="text-sm text-amber-200">Tên thương hiệu</p>
-                  <p className="mt-2 text-2xl font-semibold text-white">HY88</p>
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-amber-400/40 bg-slate-900/80 p-5 shadow-inner shadow-amber-500/10">
+                  <p className="text-sm uppercase tracking-[0.2em] text-amber-300">Thương hiệu</p>
+                  <p className="mt-3 text-3xl font-bold text-white">HY88</p>
                 </div>
-                <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-5">
-                  <p className="text-sm text-cyan-200">Website</p>
-                  <a href="https://hy88-woad.vercel.app/" target="_blank" rel="noreferrer" className="mt-2 block text-lg font-semibold text-white underline decoration-cyan-400/70 underline-offset-4">
-                    hy88-woad.vercel.app
-                  </a>
-                </div>
-                <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-5">
-                  <p className="text-sm text-violet-200">Liên hệ</p>
-                  <p className="mt-2 text-lg font-semibold text-white">24/7</p>
-                </div>
-              </div>
 
-              <div className="mt-8 grid gap-5 md:grid-cols-2">
-                {supportLinks.map((item) => (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-2xl border border-white/10 bg-slate-800/80 p-5 transition hover:border-amber-400/50 hover:bg-slate-800"
-                  >
-                    <p className="text-sm text-slate-400">{item.label}</p>
-                    <p className="mt-2 break-all text-base font-medium text-white">{item.value}</p>
+                <div className="rounded-2xl border border-cyan-400/40 bg-slate-900/80 p-5 shadow-inner shadow-cyan-500/10">
+                  <p className="text-sm uppercase tracking-[0.2em] text-cyan-300">Website</p>
+                  <a href="https://hy88-woad.vercel.app/" target="_blank" rel="noreferrer" className="mt-3 block text-xl font-semibold text-white underline decoration-cyan-400/70 underline-offset-4">
+                    https://hy88-woad.vercel.app/
                   </a>
-                ))}
+                </div>
+
+                <div className="rounded-2xl border border-violet-400/40 bg-slate-900/80 p-5 shadow-inner shadow-violet-500/10">
+                  <p className="text-sm uppercase tracking-[0.2em] text-violet-300">Liên hệ</p>
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                    <a
+                      href="https://www.facebook.com/duchuy23712"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 rounded-xl border border-blue-400/40 bg-blue-500/10 px-4 py-3 text-center font-medium text-blue-200 transition hover:bg-blue-500/20"
+                    >
+                      Facebook
+                    </a>
+                    <a
+                      href="https://discord.gg/tnSt9Ppb94"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 text-center font-medium text-violet-200 transition hover:bg-violet-500/20"
+                    >
+                      Discord
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
@@ -174,20 +178,6 @@ export default function HomePage() {
                 <h1 className="mt-3 text-4xl font-bold">Xin chào, {session.user?.name || "Người chơi"}</h1>
               </div>
 
-              <div className="grid gap-5 md:grid-cols-3">
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5">
-                  <p className="text-sm text-emerald-200">Tài khoản</p>
-                  <p className="mt-2 text-2xl font-semibold">{session.user?.name || "Người chơi"}</p>
-                </div>
-                <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-5">
-                  <p className="text-sm text-cyan-200">Trạng thái</p>
-                  <p className="mt-2 text-2xl font-semibold">Đã đăng nhập</p>
-                </div>
-                <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-5">
-                  <p className="text-sm text-violet-200">Nền tảng</p>
-                  <p className="mt-2 text-2xl font-semibold">Next.js + Vercel</p>
-                </div>
-              </div>
             </>
           )}
         </section>
@@ -215,7 +205,7 @@ export default function HomePage() {
           </button>
         </div>
 
-        <h1 className="mb-6 text-3xl font-bold text-white">Sòng bạc online</h1>
+        <h1 className="mb-6 text-3xl font-bold text-white">HY88</h1>
 
         {mode === "signup" && (
           <div className="space-y-3">
