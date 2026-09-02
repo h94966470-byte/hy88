@@ -31,6 +31,10 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        if (user.banned) {
+          return null;
+        }
+
         if (user.passwordHash !== hashPassword(String(credentials.password))) {
           return null;
         }

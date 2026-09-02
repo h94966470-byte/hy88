@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { applyGameResult, getRecentGameRounds } from "@/lib/store";
+import { applyGameResult, getRecentGameRounds, StoredGameRound } from "@/lib/store";
 
 const getUserId = async () => {
   const session = await getServerSession(authOptions);
@@ -24,11 +24,14 @@ export async function POST(req: NextRequest) {
   if (!userId || userId === "guest") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const body = (await req.json()) as { result?: string; playerChoice?: string; won?: boolean; balanceDelta?: number; debtDelta?: number };
+    const body = (await req.json()) as { result?: string; playerChoice?: string; won?: boolean; balanceDelta?: number; debtDelta?: number; wagerMode?: string; selectedNumber?: number | null; total?: number; dice?: number[] };
     const { balanceDelta, debtDelta } = body;
     if (!["tai", "xiu"].includes(body.result || "") || !["tai", "xiu"].includes(body.playerChoice || "") || typeof body.won !== "boolean" ||
       typeof balanceDelta !== "number" || typeof debtDelta !== "number" || !Number.isSafeInteger(balanceDelta) ||
-      !Number.isSafeInteger(debtDelta) || debtDelta < 0) {
+        !Number.isSafeInteger(debtDelta) || debtDelta < 0 ||
+        !["tai-xiu", "triple", "pair", "total", "single"].includes(body.wagerMode || "") ||
+        !Number.isSafeInteger(body.total) || !Array.isArray(body.dice) || body.dice.length !== 3 ||
+        !body.dice.every((die) => Number.isInteger(die) && die >= 1 && die <= 6)) {
       return NextResponse.json({ error: "Dữ liệu ván chơi không hợp lệ" }, { status: 400 });
     }
 
@@ -36,6 +39,10 @@ export async function POST(req: NextRequest) {
       result: body.result as "tai" | "xiu",
       playerChoice: body.playerChoice as "tai" | "xiu",
       won: body.won,
+      wagerMode: body.wagerMode as StoredGameRound["wagerMode"],
+      selectedNumber: body.selectedNumber ?? null,
+      total: body.total as number,
+      dice: body.dice as number[],
     });
     return NextResponse.json({ ok: true, wallet });
   } catch (error) {

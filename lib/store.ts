@@ -17,6 +17,7 @@ type UserRow = {
   image?: string | null;
   provider: string;
   role?: "user" | "admin" | null;
+  banned?: boolean | null;
   created_at: string | null;
 };
 
@@ -27,6 +28,7 @@ export type StoredUser = {
   image?: string;
   provider: "credentials";
   role: "user" | "admin";
+  banned: boolean;
   createdAt: string;
 };
 
@@ -43,6 +45,10 @@ export type StoredGameRound = {
   result: "tai" | "xiu";
   playerChoice: "tai" | "xiu";
   won: boolean;
+  wagerMode: "tai-xiu" | "triple" | "pair" | "total" | "single";
+  selectedNumber: number | null;
+  total: number;
+  dice: number[];
 };
 
 export type LeaderboardEntry = {
@@ -63,6 +69,19 @@ export type AdminUserEntry = {
   rounds: number;
   wins: number;
   losses: number;
+  banned: boolean;
+};
+
+export type GameStats = {
+  total: number;
+  wins: number;
+  losses: number;
+  tai: number;
+  xiu: number;
+  triple: number;
+  pair: number;
+  totalBet: number;
+  single: number;
 };
 
 export function hashPassword(value: string) {
@@ -82,6 +101,7 @@ export async function readUsers(): Promise<StoredUser[]> {
       image: row.image ?? undefined,
       provider: row.provider as "credentials",
       role: row.role === "admin" ? "admin" : "user",
+      banned: Boolean(row.banned),
       createdAt: row.created_at ?? new Date().toISOString(),
     }));
   } catch (error) {
@@ -113,6 +133,7 @@ export async function findUserByUsername(username: string): Promise<StoredUser |
       image: row.image ?? undefined,
       provider: row.provider as "credentials",
       role: row.role === "admin" ? "admin" : "user",
+      banned: Boolean(row.banned),
       createdAt: row.created_at ?? new Date().toISOString(),
     };
   } catch (error) {
@@ -128,8 +149,8 @@ export async function createUser(user: StoredUser): Promise<StoredUser> {
       ? "admin"
       : user.role;
     await sql`
-      INSERT INTO users (id, username, password_hash, image, provider, role, created_at)
-      VALUES (${user.id}, ${user.username}, ${user.passwordHash || null}, ${user.image || null}, ${user.provider}, ${role}, ${user.createdAt})
+      INSERT INTO users (id, username, password_hash, image, provider, role, banned, created_at)
+      VALUES (${user.id}, ${user.username}, ${user.passwordHash || null}, ${user.image || null}, ${user.provider}, ${role}, ${user.banned}, ${user.createdAt})
       ON CONFLICT (username) DO UPDATE SET
         password_hash = EXCLUDED.password_hash,
         image = EXCLUDED.image,
@@ -292,8 +313,8 @@ export async function repayWallet(userId: string, amount: number): Promise<Store
 export async function createGameRound(userId: string, round: StoredGameRound): Promise<void> {
   await ensureDatabaseReady();
   await sql`
-    INSERT INTO game_rounds (id, user_id, result, player_choice, won)
-    VALUES (${crypto.randomUUID()}, ${userId}, ${round.result}, ${round.playerChoice}, ${round.won})
+    INSERT INTO game_rounds (id, user_id, result, player_choice, won, wager_mode, selected_number, total, dice_1, dice_2, dice_3)
+    VALUES (${crypto.randomUUID()}, ${userId}, ${round.result}, ${round.playerChoice}, ${round.won}, ${round.wagerMode}, ${round.selectedNumber}, ${round.total}, ${round.dice[0]}, ${round.dice[1]}, ${round.dice[2]})
   `;
 }
 
@@ -326,15 +347,19 @@ export async function applyGameResult(
 export async function getRecentGameRounds(limit = 100): Promise<StoredGameRound[]> {
   await ensureDatabaseReady();
   const result = await sql`
-    SELECT result, player_choice, won
+    SELECT result, player_choice, won, wager_mode, selected_number, total, dice_1, dice_2, dice_3
     FROM game_rounds
     ORDER BY created_at DESC
     LIMIT ${limit}
   `;
-  return (result.rows as Array<{ result: "tai" | "xiu"; player_choice: "tai" | "xiu"; won: boolean }>).reverse().map((row) => ({
+  return (result.rows as Array<{ result: "tai" | "xiu"; player_choice: "tai" | "xiu"; won: boolean; wager_mode: StoredGameRound["wagerMode"]; selected_number: number | null; total: number | null; dice_1: number | null; dice_2: number | null; dice_3: number | null }>).reverse().map((row) => ({
     result: row.result,
     playerChoice: row.player_choice,
     won: row.won,
+    wagerMode: row.wager_mode,
+    selectedNumber: row.selected_number,
+    total: row.total ?? 0,
+    dice: [row.dice_1 ?? 0, row.dice_2 ?? 0, row.dice_3 ?? 0],
   }));
 }
 
@@ -372,7 +397,7 @@ export async function getLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
 export async function getAdminUsers(): Promise<AdminUserEntry[]> {
   await ensureDatabaseReady();
   const result = await sql`
-    SELECT u.id, u.username, u.role,
+    SELECT u.id, u.username, u.role, u.banned,
       COALESCE(w.balance, 100000) AS balance,
       COALESCE(w.debt, 0) AS debt,
       COUNT(g.id)::integer AS rounds,
@@ -381,10 +406,10 @@ export async function getAdminUsers(): Promise<AdminUserEntry[]> {
     FROM users u
     LEFT JOIN user_wallets w ON w.user_id = u.id
     LEFT JOIN game_rounds g ON g.user_id = u.id
-    GROUP BY u.id, u.username, u.role, w.balance, w.debt
+    GROUP BY u.id, u.username, u.role, u.banned, w.balance, w.debt
     ORDER BY COALESCE(w.balance, 100000) DESC, u.username ASC
   `;
-  return (result.rows as Array<{ id: string; username: string; role: string; balance: string | number; debt: string | number; rounds: string | number; wins: string | number; losses: string | number }>).map((row) => ({
+  return (result.rows as Array<{ id: string; username: string; role: string; banned: boolean; balance: string | number; debt: string | number; rounds: string | number; wins: string | number; losses: string | number }>).map((row) => ({
     id: row.id,
     username: row.username,
     role: row.role === "admin" ? "admin" : "user",
@@ -393,6 +418,7 @@ export async function getAdminUsers(): Promise<AdminUserEntry[]> {
     rounds: Number(row.rounds),
     wins: Number(row.wins),
     losses: Number(row.losses),
+    banned: Boolean(row.banned),
   }));
 }
 
@@ -408,4 +434,43 @@ export async function adjustWalletBalance(userId: string, amount: number): Promi
   `;
   if (!result.rows.length) throw new Error("BALANCE_WOULD_BE_NEGATIVE");
   return mapWallet(result.rows[0] as WalletRow);
+}
+
+export async function setUserBanned(userId: string, banned: boolean): Promise<void> {
+  await ensureDatabaseReady();
+  await sql`UPDATE users SET banned = ${banned} WHERE id = ${userId}`;
+}
+
+export async function adjustWalletDebt(userId: string, amount: number): Promise<StoredWallet> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    UPDATE user_wallets
+    SET debt = debt + ${amount}, updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId} AND debt + ${amount} >= 0
+    RETURNING balance, debt, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
+  `;
+  if (!result.rows.length) throw new Error("DEBT_WOULD_BE_NEGATIVE");
+  return mapWallet(result.rows[0] as WalletRow);
+}
+
+export async function getGameStats(): Promise<GameStats> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    SELECT COUNT(*)::integer AS total,
+      COUNT(*) FILTER (WHERE won)::integer AS wins,
+      COUNT(*) FILTER (WHERE NOT won)::integer AS losses,
+      COUNT(*) FILTER (WHERE result = 'tai')::integer AS tai,
+      COUNT(*) FILTER (WHERE result = 'xiu')::integer AS xiu,
+      COUNT(*) FILTER (WHERE wager_mode = 'triple')::integer AS triple,
+      COUNT(*) FILTER (WHERE wager_mode = 'pair')::integer AS pair,
+      COUNT(*) FILTER (WHERE wager_mode = 'total')::integer AS total_bet,
+      COUNT(*) FILTER (WHERE wager_mode = 'single')::integer AS single
+    FROM game_rounds
+  `;
+  const row = result.rows[0] as Record<string, string | number>;
+  return {
+    total: Number(row.total), wins: Number(row.wins), losses: Number(row.losses),
+    tai: Number(row.tai), xiu: Number(row.xiu), triple: Number(row.triple),
+    pair: Number(row.pair), totalBet: Number(row.total_bet), single: Number(row.single),
+  };
 }

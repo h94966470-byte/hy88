@@ -19,6 +19,7 @@ export async function initializeDatabase() {
         image VARCHAR(255),
         provider VARCHAR(50) NOT NULL DEFAULT 'credentials',
         role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+        banned BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `;
@@ -26,6 +27,11 @@ export async function initializeDatabase() {
     await sql`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
+    `;
+
+    await sql`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE;
     `;
 
     await sql`
@@ -76,8 +82,33 @@ export async function initializeDatabase() {
         result VARCHAR(3) NOT NULL CHECK (result IN ('tai', 'xiu')),
         player_choice VARCHAR(3) NOT NULL CHECK (player_choice IN ('tai', 'xiu')),
         won BOOLEAN NOT NULL,
+        wager_mode VARCHAR(20) NOT NULL DEFAULT 'tai-xiu',
+        selected_number INTEGER,
+        total INTEGER,
+        dice_1 INTEGER,
+        dice_2 INTEGER,
+        dice_3 INTEGER,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+
+    await sql`
+      ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS wager_mode VARCHAR(20) NOT NULL DEFAULT 'tai-xiu';
+    `;
+    await sql`
+      ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS selected_number INTEGER;
+    `;
+    await sql`
+      ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS total INTEGER;
+    `;
+    await sql`
+      ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS dice_1 INTEGER;
+    `;
+    await sql`
+      ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS dice_2 INTEGER;
+    `;
+    await sql`
+      ALTER TABLE game_rounds ADD COLUMN IF NOT EXISTS dice_3 INTEGER;
     `;
 
     await sql`

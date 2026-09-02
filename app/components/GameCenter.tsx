@@ -34,6 +34,10 @@ type RoundPoint = {
   result: "tai" | "xiu";
   playerChoice: "tai" | "xiu";
   won: boolean;
+  wagerMode?: "tai-xiu" | "triple" | "pair" | "total" | "single";
+  selectedNumber?: number | null;
+  total?: number;
+  dice?: number[];
 };
 
 interface GameCenterProps {
@@ -154,7 +158,15 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       newBalance = 0;
     }
 
-    const newRound: RoundPoint = { result, playerChoice: choice ?? result, won };
+    const newRound: RoundPoint = {
+      result,
+      playerChoice: choice ?? result,
+      won,
+      wagerMode,
+      selectedNumber: wagerMode === "tai-xiu" ? null : selectedNumber,
+      total,
+      dice,
+    };
     const gameResponse = await fetch("/api/games", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
