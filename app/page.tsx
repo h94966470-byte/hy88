@@ -2,7 +2,7 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const menuItems = ["Trang chủ", "Sòng bạc", "Ví", "Khuyến mãi", "Hỗ trợ"];
 const supportLinks = [
@@ -23,6 +23,29 @@ const supportLinks = [
   },
 ];
 
+type WalletState = {
+  balance: number;
+  dailyClaimDate: string | null;
+  newbieStep: number;
+  createdAt: string;
+};
+
+const formatDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getWalletStorageKey = (username?: string | null) => `hy88-wallet-${username || "guest"}`;
+
+const createDefaultWallet = (): WalletState => ({
+  balance: 100000,
+  dailyClaimDate: null,
+  newbieStep: 0,
+  createdAt: new Date().toISOString(),
+});
+
 export default function HomePage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -33,8 +56,87 @@ export default function HomePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [wallet, setWallet] = useState<WalletState | null>(null);
 
   const isAuthenticated = status === "authenticated" && !!session?.user;
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setWallet(null);
+      return;
+    }
+
+    const walletKey = getWalletStorageKey(session.user?.name || session.user?.email || "guest");
+    const saved = localStorage.getItem(walletKey);
+
+    if (!saved) {
+      const initialWallet = createDefaultWallet();
+      localStorage.setItem(walletKey, JSON.stringify(initialWallet));
+      setWallet(initialWallet);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(saved) as WalletState;
+      const normalized: WalletState = {
+        balance: Number(parsed.balance) || 100000,
+        dailyClaimDate: parsed.dailyClaimDate || null,
+        newbieStep: Number(parsed.newbieStep) || 0,
+        createdAt: parsed.createdAt || new Date().toISOString(),
+      };
+      setWallet(normalized);
+    } catch {
+      const initialWallet = createDefaultWallet();
+      localStorage.setItem(walletKey, JSON.stringify(initialWallet));
+      setWallet(initialWallet);
+    }
+  }, [isAuthenticated, session?.user?.name, session?.user?.email]);
+
+  const persistWallet = (nextWallet: WalletState) => {
+    if (!isAuthenticated) return;
+    const walletKey = getWalletStorageKey(session.user?.name || session.user?.email || "guest");
+    localStorage.setItem(walletKey, JSON.stringify(nextWallet));
+    setWallet(nextWallet);
+  };
+
+  const handleDailyBonus = () => {
+    if (!wallet) return;
+    const todayKey = formatDateKey(new Date());
+
+    if (wallet.dailyClaimDate === todayKey) {
+      setMessage("Bạn đã nhận Daily hôm nay rồi.");
+      return;
+    }
+
+    const nextWallet = {
+      ...wallet,
+      balance: wallet.balance + 50000,
+      dailyClaimDate: todayKey,
+    };
+
+    persistWallet(nextWallet);
+    setMessage("Bạn đã nhận 50.000 VND từ Daily.");
+  };
+
+  const handleNewUserDaily = () => {
+    if (!wallet) return;
+    const newbieRewards = [300000, 200000, 100000, 100000, 100000, 100000, 100000];
+
+    if (wallet.newbieStep >= newbieRewards.length) {
+      setMessage("Nút Daily người mới đã hết hiệu lực.");
+      return;
+    }
+
+    const reward = newbieRewards[wallet.newbieStep];
+    const nextWallet = {
+      ...wallet,
+      balance: wallet.balance + reward,
+      newbieStep: wallet.newbieStep + 1,
+    };
+
+    persistWallet(nextWallet);
+    setMessage(`Bạn nhận ${reward.toLocaleString("vi-VN")} VND từ Daily người mới.`);
+  };
 
   const handleSignup = async () => {
     if (!username.trim() || !password.trim()) {
@@ -128,7 +230,48 @@ export default function HomePage() {
         </header>
 
         <section className="mx-auto max-w-6xl px-6 py-10">
-          {activeMenu === "Hỗ trợ" ? (
+          {activeMenu === "Ví" ? (
+            <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Ví tiền</p>
+                  <h1 className="mt-2 text-4xl font-bold text-white">{wallet ? `${wallet.balance.toLocaleString("vi-VN")} VND` : "0 VND"}</h1>
+                </div>
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                  Tài khoản mới: 100.000 VND
+                </div>
+              </div>
+
+              <div className="mt-8 grid gap-5 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={handleDailyBonus}
+                  className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-left transition hover:bg-amber-500/15"
+                >
+                  <p className="text-sm text-amber-200">Daily</p>
+                  <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
+                  <p className="mt-2 text-sm text-slate-300">Nhận mỗi ngày, reset 00:00 ngày mai.</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleNewUserDaily}
+                  disabled={(wallet?.newbieStep ?? 0) >= 7}
+                  className="rounded-2xl border border-violet-400/40 bg-violet-500/10 p-5 text-left transition hover:bg-violet-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <p className="text-sm text-violet-200">Daily người mới</p>
+                  <p className="mt-2 text-2xl font-bold text-white">
+                    {(wallet?.newbieStep ?? 0) >= 7 ? "Hoàn thành" : `+${[300000, 200000, 100000, 100000, 100000, 100000, 100000][wallet?.newbieStep ?? 0].toLocaleString("vi-VN")} VND`}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-300">
+                    {wallet && (wallet.newbieStep ?? 0) >= 7 ? "Bạn đã hoàn tất 7 ngày." : "Ngày 1: 300k • Ngày 2: 200k • Từ ngày 3 đến 7: 100k"}
+                  </p>
+                </button>
+              </div>
+
+              {message && <p className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{message}</p>}
+            </div>
+          ) : activeMenu === "Hỗ trợ" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
               <div className="mb-6">
                 <p className="text-sm uppercase tracking-[0.24em] text-amber-300">HY88</p>
