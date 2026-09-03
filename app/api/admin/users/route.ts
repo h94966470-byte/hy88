@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { adjustWalletBalance, adjustWalletDebt, deleteUser, getAdminUsers, setUserBanned } from "@/lib/store";
+import { adjustWalletBalance, adjustWalletDebt, deleteUser, getAdminUsers, resetAllPlayerBalances, resetAllPlayerData, resetAllPlayerDebts, setUserBanned } from "@/lib/store";
 
 const getAdminSession = async () => {
   const session = await getServerSession(authOptions);
@@ -72,5 +72,29 @@ export async function DELETE(req: NextRequest) {
     }
     console.error("Delete admin user error:", error);
     return NextResponse.json({ error: "Không thể xóa tài khoản" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  if (!(await getAdminSession())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  try {
+    const body = (await req.json()) as { action?: unknown };
+    if (body.action === "reset-balances") {
+      await resetAllPlayerBalances();
+      return NextResponse.json({ ok: true });
+    }
+    if (body.action === "reset-debts") {
+      await resetAllPlayerDebts();
+      return NextResponse.json({ ok: true });
+    }
+    if (body.action === "reset-player-data") {
+      await resetAllPlayerData();
+      return NextResponse.json({ ok: true });
+    }
+    return NextResponse.json({ error: "Thao tác không hợp lệ" }, { status: 400 });
+  } catch (error) {
+    console.error("Reset admin player data error:", error);
+    return NextResponse.json({ error: "Không thể cập nhật dữ liệu người chơi" }, { status: 500 });
   }
 }

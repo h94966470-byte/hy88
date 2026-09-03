@@ -654,6 +654,50 @@ export async function deleteUser(userId: string): Promise<void> {
   if (!result.rows.length) throw new Error("USER_NOT_FOUND_OR_ADMIN");
 }
 
+export async function resetAllPlayerBalances(): Promise<void> {
+  await ensureDatabaseReady();
+  await sql`
+    INSERT INTO user_wallets (user_id, balance)
+    SELECT id, 0 FROM users WHERE role <> 'admin'
+    ON CONFLICT (user_id) DO UPDATE SET
+      balance = 0,
+      updated_at = CURRENT_TIMESTAMP
+  `;
+}
+
+export async function resetAllPlayerDebts(): Promise<void> {
+  await ensureDatabaseReady();
+  await sql`
+    UPDATE user_wallets
+    SET debt = 0,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id IN (SELECT id FROM users WHERE role <> 'admin')
+  `;
+}
+
+export async function resetAllPlayerData(): Promise<void> {
+  await ensureDatabaseReady();
+  await sql`
+    INSERT INTO user_wallets (user_id, balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date)
+    SELECT id, 100000, 0, 0, 0, NULL, 0, NULL
+    FROM users
+    WHERE role <> 'admin'
+    ON CONFLICT (user_id) DO UPDATE SET
+      balance = 100000,
+      debt = 0,
+      win_streak = 0,
+      loss_streak = 0,
+      daily_claim_date = NULL,
+      newbie_step = 0,
+      newbie_daily_claim_date = NULL,
+      updated_at = CURRENT_TIMESTAMP
+  `;
+  await sql`
+    DELETE FROM game_rounds
+    WHERE user_id IN (SELECT id FROM users WHERE role <> 'admin')
+  `;
+}
+
 export async function adjustWalletDebt(userId: string, amount: number): Promise<StoredWallet> {
   await ensureDatabaseReady();
   const result = await sql`
