@@ -161,12 +161,12 @@ export default function AdminDashboard() {
     await loadUsers();
   };
 
-  const runPlayerDataAction = async (action: "reset-balances" | "reset-debts" | "reset-player-data", confirmation: string, successMessage: string) => {
-    if (!window.confirm(confirmation)) return;
+  const runPlayerDataAction = async (user: AdminUser, action: "reset-balance" | "reset-debt" | "reset-player-data", confirmation: string, successMessage: string) => {
+    if (user.role === "admin" || !window.confirm(confirmation)) return;
     const response = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, userId: user.id }),
     });
     const data = (await response.json()) as { error?: string };
     if (!response.ok) {
@@ -210,16 +210,6 @@ export default function AdminDashboard() {
           </div>
         </section>
 
-        <section className="mb-6 rounded-2xl border border-red-400/20 bg-red-950/20 p-5">
-          <h2 className="text-lg font-semibold text-red-200">Quản lý dữ liệu người chơi</h2>
-          <p className="mt-1 text-sm text-slate-400">Các thao tác chỉ áp dụng cho tài khoản người chơi, không áp dụng cho Admin.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={() => void runPlayerDataAction("reset-balances", "Bạn có chắc muốn đưa toàn bộ số dư người chơi về 0?", "Đã xoá toàn bộ số dư người chơi.")} className="rounded-lg bg-red-500/20 px-4 py-2 text-sm text-red-200">Xoá tất cả tiền</button>
-            <button type="button" onClick={() => void runPlayerDataAction("reset-debts", "Bạn có chắc muốn xoá toàn bộ khoản nợ người chơi?", "Đã xoá toàn bộ khoản nợ người chơi.")} className="rounded-lg bg-amber-500/20 px-4 py-2 text-sm text-amber-200">Xoá tất cả nợ</button>
-            <button type="button" onClick={() => void runPlayerDataAction("reset-player-data", "Reset dữ liệu sẽ xoá lịch sử ván, xoá nợ và đưa ví người chơi về 100.000. Bạn có chắc không?", "Đã reset dữ liệu người chơi về ban đầu.")} className="rounded-lg bg-cyan-500/20 px-4 py-2 text-sm text-cyan-200">Reset dữ liệu người chơi</button>
-          </div>
-        </section>
-
         {stats && (
           <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
@@ -250,7 +240,7 @@ export default function AdminDashboard() {
                 <th className="px-4 py-4">Điều chỉnh số dư</th>
                 <th className="px-4 py-4">Điều chỉnh nợ</th>
                 <th className="px-4 py-4">Trạng thái</th>
-                <th className="px-4 py-4">Tài khoản</th>
+                <th className="px-4 py-4">Dữ liệu người chơi</th>
               </tr>
             </thead>
             <tbody>
@@ -271,7 +261,7 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-4 py-4"><div className="flex gap-2"><input type="number" min="1" value={amounts[`debt-${user.id}`] || ""} onChange={(event) => setAmounts((current) => ({ ...current, [`debt-${user.id}`]: event.target.value }))} placeholder="Tiền nợ" className="w-28 rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-white" /><button type="button" onClick={() => void adjustDebt(user.id, 1)} disabled={loading} className="rounded-lg bg-amber-500/20 px-3 py-2 text-amber-200">Thêm</button><button type="button" onClick={() => void adjustDebt(user.id, -1)} disabled={loading} className="rounded-lg bg-cyan-500/20 px-3 py-2 text-cyan-200">Xóa</button></div></td>
                   <td className="px-4 py-4"><button type="button" onClick={() => void toggleBan(user)} disabled={loading || user.role === "admin"} className="rounded-lg bg-white/10 px-3 py-2 text-slate-200 disabled:cursor-not-allowed disabled:opacity-50">{user.banned ? "Unban" : "Ban"}</button></td>
-                  <td className="px-4 py-4"><button type="button" onClick={() => void deleteAccount(user)} disabled={loading || user.role === "admin"} className="rounded-lg bg-red-500/20 px-3 py-2 text-red-200 disabled:cursor-not-allowed disabled:opacity-50">Xóa</button></td>
+                  <td className="px-4 py-4"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => void runPlayerDataAction(user, "reset-balance", `Đưa số dư của ${user.username} về 0?`, "Đã xoá số dư tài khoản.")} disabled={loading || user.role === "admin"} className="rounded-lg bg-red-500/20 px-3 py-2 text-red-200 disabled:cursor-not-allowed disabled:opacity-50">Xoá tiền</button><button type="button" onClick={() => void runPlayerDataAction(user, "reset-debt", `Đưa khoản nợ của ${user.username} về 0?`, "Đã xoá nợ tài khoản.")} disabled={loading || user.role === "admin"} className="rounded-lg bg-amber-500/20 px-3 py-2 text-amber-200 disabled:cursor-not-allowed disabled:opacity-50">Xoá nợ</button><button type="button" onClick={() => void runPlayerDataAction(user, "reset-player-data", `Reset toàn bộ dữ liệu của ${user.username}? Lịch sử ván sẽ bị xoá và ví về 100.000.`, "Đã reset dữ liệu tài khoản.")} disabled={loading || user.role === "admin"} className="rounded-lg bg-cyan-500/20 px-3 py-2 text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50">Reset</button><button type="button" onClick={() => void deleteAccount(user)} disabled={loading || user.role === "admin"} className="rounded-lg bg-red-500/20 px-3 py-2 text-red-200 disabled:cursor-not-allowed disabled:opacity-50">Xóa TK</button></div></td>
                 </tr>
               ))}
               {!loading && !users.length && <tr><td colSpan={10} className="px-4 py-10 text-center text-slate-400">Chưa có tài khoản.</td></tr>}

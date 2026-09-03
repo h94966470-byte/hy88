@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { adjustWalletBalance, adjustWalletDebt, deleteUser, getAdminUsers, resetAllPlayerBalances, resetAllPlayerData, resetAllPlayerDebts, setUserBanned } from "@/lib/store";
+import { adjustWalletBalance, adjustWalletDebt, deleteUser, getAdminUsers, resetPlayerBalance, resetPlayerData, resetPlayerDebt, setUserBanned } from "@/lib/store";
 
 const getAdminSession = async () => {
   const session = await getServerSession(authOptions);
@@ -79,21 +79,27 @@ export async function POST(req: NextRequest) {
   if (!(await getAdminSession())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
-    const body = (await req.json()) as { action?: unknown };
-    if (body.action === "reset-balances") {
-      await resetAllPlayerBalances();
+    const body = (await req.json()) as { action?: unknown; userId?: unknown };
+    if (typeof body.userId !== "string" || !body.userId) {
+      return NextResponse.json({ error: "Tài khoản không hợp lệ" }, { status: 400 });
+    }
+    if (body.action === "reset-balance") {
+      await resetPlayerBalance(body.userId);
       return NextResponse.json({ ok: true });
     }
-    if (body.action === "reset-debts") {
-      await resetAllPlayerDebts();
+    if (body.action === "reset-debt") {
+      await resetPlayerDebt(body.userId);
       return NextResponse.json({ ok: true });
     }
     if (body.action === "reset-player-data") {
-      await resetAllPlayerData();
+      await resetPlayerData(body.userId);
       return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ error: "Thao tác không hợp lệ" }, { status: 400 });
   } catch (error) {
+    if (error instanceof Error && error.message === "USER_NOT_FOUND_OR_ADMIN") {
+      return NextResponse.json({ error: "Không thể cập nhật tài khoản Admin hoặc tài khoản không tồn tại" }, { status: 409 });
+    }
     console.error("Reset admin player data error:", error);
     return NextResponse.json({ error: "Không thể cập nhật dữ liệu người chơi" }, { status: 500 });
   }

@@ -654,47 +654,51 @@ export async function deleteUser(userId: string): Promise<void> {
   if (!result.rows.length) throw new Error("USER_NOT_FOUND_OR_ADMIN");
 }
 
-export async function resetAllPlayerBalances(): Promise<void> {
+export async function resetPlayerBalance(userId: string): Promise<void> {
   await ensureDatabaseReady();
-  await sql`
-    INSERT INTO user_wallets (user_id, balance)
-    SELECT id, 0 FROM users WHERE role <> 'admin'
-    ON CONFLICT (user_id) DO UPDATE SET
-      balance = 0,
-      updated_at = CURRENT_TIMESTAMP
+  const result = await sql`
+    UPDATE user_wallets w
+    SET balance = 0, updated_at = CURRENT_TIMESTAMP
+    FROM users u
+    WHERE w.user_id = u.id AND u.id = ${userId} AND u.role <> 'admin'
+    RETURNING w.user_id
   `;
+  if (!result.rows.length) throw new Error("USER_NOT_FOUND_OR_ADMIN");
 }
 
-export async function resetAllPlayerDebts(): Promise<void> {
+export async function resetPlayerDebt(userId: string): Promise<void> {
   await ensureDatabaseReady();
-  await sql`
-    UPDATE user_wallets
-    SET debt = 0,
+  const result = await sql`
+    UPDATE user_wallets w
+    SET debt = 0, updated_at = CURRENT_TIMESTAMP
+    FROM users u
+    WHERE w.user_id = u.id AND u.id = ${userId} AND u.role <> 'admin'
+    RETURNING w.user_id
+  `;
+  if (!result.rows.length) throw new Error("USER_NOT_FOUND_OR_ADMIN");
+}
+
+export async function resetPlayerData(userId: string): Promise<void> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    UPDATE user_wallets w
+    SET balance = 100000,
+        debt = 0,
+        win_streak = 0,
+        loss_streak = 0,
+        daily_claim_date = NULL,
+        newbie_step = 0,
+        newbie_daily_claim_date = NULL,
         updated_at = CURRENT_TIMESTAMP
-    WHERE user_id IN (SELECT id FROM users WHERE role <> 'admin')
+    FROM users u
+    WHERE w.user_id = u.id AND u.id = ${userId} AND u.role <> 'admin'
+    RETURNING w.user_id
   `;
-}
-
-export async function resetAllPlayerData(): Promise<void> {
-  await ensureDatabaseReady();
-  await sql`
-    INSERT INTO user_wallets (user_id, balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date)
-    SELECT id, 100000, 0, 0, 0, NULL, 0, NULL
-    FROM users
-    WHERE role <> 'admin'
-    ON CONFLICT (user_id) DO UPDATE SET
-      balance = 100000,
-      debt = 0,
-      win_streak = 0,
-      loss_streak = 0,
-      daily_claim_date = NULL,
-      newbie_step = 0,
-      newbie_daily_claim_date = NULL,
-      updated_at = CURRENT_TIMESTAMP
-  `;
+  if (!result.rows.length) throw new Error("USER_NOT_FOUND_OR_ADMIN");
   await sql`
     DELETE FROM game_rounds
-    WHERE user_id IN (SELECT id FROM users WHERE role <> 'admin')
+    WHERE user_id = ${userId}
+      AND user_id IN (SELECT id FROM users WHERE id = ${userId} AND role <> 'admin')
   `;
 }
 
