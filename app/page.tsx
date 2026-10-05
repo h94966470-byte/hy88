@@ -596,76 +596,83 @@ export default function HomePage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#1e293b,_#020617_60%)] px-4">
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl">
-        <div className="mb-6 flex gap-2 rounded-full bg-slate-800 p-1">
-          <button
-            type="button"
-            onClick={() => setMode("login")}
-            className={`flex-1 rounded-full px-4 py-2 font-medium ${mode === "login" ? "bg-amber-400 text-slate-950" : "text-slate-300"}`}
-          >
-            Đăng nhập
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("signup")}
-            className={`flex-1 rounded-full px-4 py-2 font-medium ${mode === "signup" ? "bg-amber-400 text-slate-950" : "text-slate-300"}`}
-          >
-            Đăng ký
-          </button>
+      <div className="auth-shell w-full max-w-md">
+        <div className="auth-card rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl">
+          <div className="relative mb-6 rounded-full bg-slate-800 p-1 ring-1 ring-white/10">
+            <div
+              className={`auth-mode-indicator absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-amber-400 transition-transform duration-300 ease-out ${mode === "login" ? "translate-x-0" : "translate-x-full"}`}
+            />
+            <div className="relative z-10 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className={`relative z-10 flex-1 rounded-full px-4 py-2 font-medium transition-colors duration-200 ${mode === "login" ? "text-slate-950" : "text-slate-300"}`}
+              >
+                Đăng nhập
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("signup")}
+                className={`relative z-10 flex-1 rounded-full px-4 py-2 font-medium transition-colors duration-200 ${mode === "signup" ? "text-slate-950" : "text-slate-300"}`}
+              >
+                Đăng ký
+              </button>
+            </div>
+          </div>
+
+          <h1 className="mb-6 text-3xl font-bold text-white">HY88</h1>
+
+          {mode === "signup" && (
+            <div className="space-y-3">
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username"
+                className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
+              />
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mật khẩu"
+                type="password"
+                className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
+              />
+              <input
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Xác nhận mật khẩu"
+                type="password"
+                className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
+              />
+              <button type="button" onClick={handleSignup} disabled={loading} className="auth-btn w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
+                {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
+              </button>
+            </div>
+          )}
+
+          {mode === "login" && (
+            <div className="space-y-3">
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Username"
+                className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
+              />
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mật khẩu"
+                type="password"
+                className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
+              />
+              <button type="button" onClick={handleCredentialsLogin} disabled={loading} className="auth-btn w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
+                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+              </button>
+            </div>
+          )}
+
+          {message && <p className="auth-message mt-4 text-sm text-amber-300">{message}</p>}
         </div>
-
-        <h1 className="mb-6 text-3xl font-bold text-white">HY88</h1>
-
-        {mode === "signup" && (
-          <div className="space-y-3">
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
-            />
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mật khẩu"
-              type="password"
-              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
-            />
-            <input
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Xác nhận mật khẩu"
-              type="password"
-              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
-            />
-            <button type="button" onClick={handleSignup} disabled={loading} className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
-              {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
-            </button>
-          </div>
-        )}
-
-        {mode === "login" && (
-          <div className="space-y-3">
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
-            />
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Mật khẩu"
-              type="password"
-              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
-            />
-            <button type="button" onClick={handleCredentialsLogin} disabled={loading} className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
-              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-            </button>
-          </div>
-        )}
-
-        {message && <p className="mt-4 text-sm text-amber-300">{message}</p>}
       </div>
       <SimulationDisclaimer />
     </main>

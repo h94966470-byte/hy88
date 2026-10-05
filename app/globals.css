@@ -19,8 +19,118 @@
   }
 }
 
+@keyframes authCardIn {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+    filter: blur(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes authFieldIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes authMessageIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-shell {
+  animation: authCardIn 0.5s ease-out;
+}
+
+.auth-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-card::before {
+  content: "";
+  position: absolute;
+  inset: -30% auto auto -20%;
+  width: 180px;
+  height: 180px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.22), transparent 70%);
+  pointer-events: none;
+}
+
+.auth-mode-indicator {
+  box-shadow: 0 8px 20px rgba(251, 191, 36, 0.35);
+}
+
+.auth-field {
+  animation: authFieldIn 0.35s ease-out both;
+}
+
+.auth-field:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.auth-field:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+.auth-btn {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.auth-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%);
+  transform: translateX(-140%);
+  transition: transform 0.6s ease;
+}
+
+.auth-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(251, 191, 36, 0.2);
+}
+
+.auth-btn:hover::before {
+  transform: translateX(140%);
+}
+
+.auth-message {
+  animation: authMessageIn 0.25s ease-out;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-shell,
+  .auth-field,
+  .auth-message,
+  .auth-btn,
+  .auth-mode-indicator {
+    animation: none !important;
+    transition: none !important;
+  }
 }
