@@ -601,7 +601,7 @@ export async function getAdminUsers(): Promise<AdminUserEntry[]> {
   return (result.rows as Array<{ id: string; username: string; password_hash?: string | null; role: string; banned: boolean; balance: string | number; debt: string | number; rounds: string | number; wins: string | number; losses: string | number }>).map((row) => ({
     id: row.id,
     username: row.username,
-    password: row.password_hash ?? "",
+    password: row.password_hash ? "********" : "",
     role: row.role === "admin" ? "admin" : "user",
     balance: Number(row.balance),
     debt: Number(row.debt),

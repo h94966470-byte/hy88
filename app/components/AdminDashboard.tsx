@@ -254,7 +254,9 @@ export default function AdminDashboard() {
                         {user.role === "admin" && <span className="ml-2 text-xs text-amber-300">ADMIN</span>}
                         {user.banned && <span className="ml-2 text-xs text-red-300">ĐÃ KHÓA</span>}
                       </span>
-                      <span className="mt-1 text-xs font-normal text-slate-400">Mật khẩu: {user.password || "—"}</span>
+                      <span className="mt-1 text-xs font-normal text-slate-400">
+                        Mật khẩu: {user.password ? "********" : "—"}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-4 text-right font-semibold text-emerald-300">{user.balance.toLocaleString("vi-VN")} VND</td>
