@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 type AdminUser = {
   id: string;
   username: string;
+  password?: string;
   role: "user" | "admin";
   balance: number;
   debt: number;
@@ -245,8 +246,17 @@ export default function AdminDashboard() {
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id} className="border-b border-white/5 last:border-0">
-                  <td className="px-4 py-4 font-semibold">{user.username} {user.role === "admin" && <span className="ml-2 text-xs text-amber-300">ADMIN</span>} {user.banned && <span className="ml-2 text-xs text-red-300">ĐÃ KHÓA</span>}</td>
+                <tr key={user.id} className="border-b border-white/5 last:border-0 align-top">
+                  <td className="px-4 py-4 font-semibold">
+                    <div className="flex flex-col">
+                      <span>
+                        {user.username}
+                        {user.role === "admin" && <span className="ml-2 text-xs text-amber-300">ADMIN</span>}
+                        {user.banned && <span className="ml-2 text-xs text-red-300">ĐÃ KHÓA</span>}
+                      </span>
+                      <span className="mt-1 text-xs font-normal text-slate-400">Mật khẩu: {user.password || "—"}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-4 text-right font-semibold text-emerald-300">{user.balance.toLocaleString("vi-VN")} VND</td>
                   <td className="px-4 py-4 text-right text-red-300">{user.debt.toLocaleString("vi-VN")} VND</td>
                   <td className="px-4 py-4 text-right">{user.rounds}</td>

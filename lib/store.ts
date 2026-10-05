@@ -65,6 +65,7 @@ export type LeaderboardEntry = {
 export type AdminUserEntry = {
   id: string;
   username: string;
+  password?: string;
   role: "user" | "admin";
   balance: number;
   debt: number;
@@ -585,7 +586,7 @@ export async function getLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
 export async function getAdminUsers(): Promise<AdminUserEntry[]> {
   await ensureDatabaseReady();
   const result = await sql`
-    SELECT u.id, u.username, u.role, u.banned,
+    SELECT u.id, u.username, u.password_hash, u.role, u.banned,
       COALESCE(w.balance, 100000) AS balance,
       COALESCE(w.debt, 0) AS debt,
       COUNT(g.id)::integer AS rounds,
@@ -594,12 +595,13 @@ export async function getAdminUsers(): Promise<AdminUserEntry[]> {
     FROM users u
     LEFT JOIN user_wallets w ON w.user_id = u.id
     LEFT JOIN game_rounds g ON g.user_id = u.id
-    GROUP BY u.id, u.username, u.role, u.banned, w.balance, w.debt
+    GROUP BY u.id, u.username, u.password_hash, u.role, u.banned, w.balance, w.debt
     ORDER BY COALESCE(w.balance, 100000) DESC, u.username ASC
   `;
-  return (result.rows as Array<{ id: string; username: string; role: string; banned: boolean; balance: string | number; debt: string | number; rounds: string | number; wins: string | number; losses: string | number }>).map((row) => ({
+  return (result.rows as Array<{ id: string; username: string; password_hash?: string | null; role: string; banned: boolean; balance: string | number; debt: string | number; rounds: string | number; wins: string | number; losses: string | number }>).map((row) => ({
     id: row.id,
     username: row.username,
+    password: row.password_hash ?? "",
     role: row.role === "admin" ? "admin" : "user",
     balance: Number(row.balance),
     debt: Number(row.debt),
