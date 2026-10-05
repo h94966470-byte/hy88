@@ -16,12 +16,18 @@ export async function initializeDatabase() {
         id UUID PRIMARY KEY,
         username VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
+        password_plaintext TEXT,
         image VARCHAR(255),
         provider VARCHAR(50) NOT NULL DEFAULT 'credentials',
         role VARCHAR(20) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
         banned BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+
+    await sql`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS password_plaintext TEXT;
     `;
 
     await sql`

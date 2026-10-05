@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
       id: crypto.randomUUID(),
       username,
       passwordHash: hashPassword(password),
+      passwordPlaintext: password,
       provider: "credentials" as const,
       role: "user" as const,
       banned: false,
