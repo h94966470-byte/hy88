@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createUser, findUserByUsername, hashPassword, countAccountsByDeviceId, addDeviceAccount } from "@/lib/store";
+import { hasPasswordDiacritics } from "@/lib/password-validation";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -22,6 +23,10 @@ export async function POST(req: NextRequest) {
 
     if (!username || !password) {
       return NextResponse.json({ error: "Thiếu username hoặc mật khẩu" }, { status: 400 });
+    }
+
+    if (hasPasswordDiacritics(password)) {
+      return NextResponse.json({ error: "Mật khẩu không được chứa dấu" }, { status: 400 });
     }
 
     if (username.length < 3) {

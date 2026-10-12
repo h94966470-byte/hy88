@@ -1,6 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { findUserByUsername, hashPassword } from "@/lib/store";
+import { hasPasswordDiacritics } from "@/lib/password-validation";
 
 const nextAuthSecret = process.env.NEXTAUTH_SECRET ?? "dev-nextauth-secret-change-me";
 
@@ -24,6 +25,11 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        const password = String(credentials.password);
+        if (hasPasswordDiacritics(password)) {
+          return null;
+        }
+
         const username = String(credentials.username).trim();
         const user = await findUserByUsername(username);
 
@@ -35,7 +41,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        if (user.passwordHash !== hashPassword(String(credentials.password))) {
+        if (user.passwordHash !== hashPassword(password)) {
           return null;
         }
 

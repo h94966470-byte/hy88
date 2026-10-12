@@ -3,6 +3,7 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { hasPasswordDiacritics } from "@/lib/password-validation";
 import GameCenter from "./components/GameCenter";
 
 const menuItems = ["Trang chủ", "Sòng bạc", "Ví", "Khuyến mãi", "Hỗ trợ"];
@@ -104,6 +105,8 @@ export default function HomePage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [wallet, setWallet] = useState<WalletState | null>(null);
@@ -267,6 +270,11 @@ export default function HomePage() {
       return;
     }
 
+    if (hasPasswordDiacritics(password)) {
+      setMessage("Mật khẩu không được chứa dấu");
+      return;
+    }
+
     if (password !== confirmPassword) {
       setMessage("Mật khẩu xác nhận không khớp");
       return;
@@ -299,6 +307,11 @@ export default function HomePage() {
   };
 
   const handleCredentialsLogin = async () => {
+    if (hasPasswordDiacritics(password)) {
+      setMessage("Mật khẩu không được chứa dấu");
+      return;
+    }
+
     setLoading(true);
     setMessage("");
 
@@ -630,20 +643,42 @@ export default function HomePage() {
                 placeholder="Username"
                 className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
               />
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mật khẩu"
-                type="password"
-                className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
-              />
-              <input
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Xác nhận mật khẩu"
-                type="password"
-                className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
-              />
+              <div className="relative">
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mật khẩu"
+                  type={showPassword ? "text" : "password"}
+                  className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 pr-16 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-3 text-sm text-slate-300 hover:text-white"
+                >
+                  {showPassword ? "Ẩn" : "Hiện"}
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Xác nhận mật khẩu"
+                  type={showConfirmPassword ? "text" : "password"}
+                  className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 pr-16 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                  aria-label={showConfirmPassword ? "Ẩn mật khẩu xác nhận" : "Hiện mật khẩu xác nhận"}
+                  aria-pressed={showConfirmPassword}
+                  className="absolute inset-y-0 right-3 text-sm text-slate-300 hover:text-white"
+                >
+                  {showConfirmPassword ? "Ẩn" : "Hiện"}
+                </button>
+              </div>
               <button type="button" onClick={handleSignup} disabled={loading} className="auth-btn w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
                 {loading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
               </button>
@@ -658,13 +693,24 @@ export default function HomePage() {
                 placeholder="Username"
                 className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
               />
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mật khẩu"
-                type="password"
-                className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
-              />
+              <div className="relative">
+                <input
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mật khẩu"
+                  type={showPassword ? "text" : "password"}
+                  className="auth-field w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 pr-16 text-white outline-none transition duration-200 placeholder:text-slate-400 focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                  aria-pressed={showPassword}
+                  className="absolute inset-y-0 right-3 text-sm text-slate-300 hover:text-white"
+                >
+                  {showPassword ? "Ẩn" : "Hiện"}
+                </button>
+              </div>
               <button type="button" onClick={handleCredentialsLogin} disabled={loading} className="auth-btn w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-50">
                 {loading ? "Đang đăng nhập..." : "Đăng nhập"}
               </button>
