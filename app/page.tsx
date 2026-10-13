@@ -97,7 +97,7 @@ const addDeviceAccount = (username: string) => {
   }
 };
 
-function MobileGameAccess({ children }: { children: ReactNode }) {
+function DeviceAccessGate({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<"checking" | "desktop" | "desktop-mode" | "portrait" | "allowed">("checking");
 
   useEffect(() => {
@@ -440,9 +440,9 @@ export default function HomePage() {
           {walletLoading ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-slate-300">Đang tải số dư...</div>
           ) : activeMenu === "Sòng bạc" ? (
-            <MobileGameAccess>
+            <DeviceAccessGate>
               <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
-            </MobileGameAccess>
+            </DeviceAccessGate>
           ) : activeMenu === "Ví" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -663,8 +663,9 @@ export default function HomePage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#1e293b,_#020617_60%)] px-4">
-      <div className="auth-shell w-full max-w-md">
+    <DeviceAccessGate>
+      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#1e293b,_#020617_60%)] px-4">
+        <div className="auth-shell w-full max-w-md">
         <div className="auth-card rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl">
           <div className="relative mb-6 rounded-full bg-slate-800 p-1 ring-1 ring-white/10">
             <div
@@ -774,8 +775,9 @@ export default function HomePage() {
 
           {message && <p className="auth-message mt-4 text-sm text-amber-300">{message}</p>}
         </div>
-      </div>
-      <SimulationDisclaimer />
-    </main>
+        </div>
+        <SimulationDisclaimer />
+      </main>
+    </DeviceAccessGate>
   );
 }
