@@ -27,14 +27,24 @@ export const getClientIp = (request: Request) => {
   return forwardedFor?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
 };
 
-export async function checkRateLimit(request: Request, window: RateLimitWindow) {
+export async function checkRateLimit(
+  request: Request,
+  window: RateLimitWindow,
+  options: { consume?: boolean; identifierSuffix?: string } = {},
+) {
   const limiter = getLimiter(window);
   if (!limiter) {
     return { success: true, retryAfter: 0 };
   }
 
   try {
-    const result = await limiter.limit(`${window}:${getClientIp(request)}`);
+    const identifier = `${window}:${getClientIp(request)}${options.identifierSuffix ? `:${options.identifierSuffix}` : ""}`;
+    if (options.consume === false) {
+      const result = await limiter.getRemaining(identifier);
+      return { success: result.remaining > 0, retryAfter: result.reset - Date.now() };
+    }
+
+    const result = await limiter.limit(identifier);
     return { success: result.success, retryAfter: result.reset - Date.now() };
   } catch (error) {
     console.error("Rate limit error:", error);

@@ -2,7 +2,7 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { hasPasswordDiacritics } from "@/lib/password-validation";
 import GameCenter from "./components/GameCenter";
 
@@ -96,6 +96,59 @@ const addDeviceAccount = (username: string) => {
     localStorage.setItem(getDeviceAccountsStorageKey(), JSON.stringify(accounts));
   }
 };
+
+function MobileGameAccess({ children }: { children: ReactNode }) {
+  const [access, setAccess] = useState<"checking" | "desktop" | "desktop-mode" | "portrait" | "allowed">("checking");
+
+  useEffect(() => {
+    const updateAccess = () => {
+      const mobileUserAgent = /Android|iPhone|iPod|IEMobile|BlackBerry|Opera Mini|Mobile/i.test(navigator.userAgent);
+      const smallTouchScreen = navigator.maxTouchPoints > 1 &&
+        Math.min(window.screen.width, window.screen.height) <= 600;
+      const isMobile = mobileUserAgent || smallTouchScreen;
+
+      if (!isMobile) {
+        setAccess("desktop");
+      } else if (smallTouchScreen && !mobileUserAgent) {
+        setAccess("desktop-mode");
+      } else if (!window.matchMedia("(orientation: landscape)").matches) {
+        setAccess("portrait");
+      } else {
+        setAccess("allowed");
+      }
+    };
+
+    updateAccess();
+    window.addEventListener("resize", updateAccess);
+    window.addEventListener("orientationchange", updateAccess);
+    return () => {
+      window.removeEventListener("resize", updateAccess);
+      window.removeEventListener("orientationchange", updateAccess);
+    };
+  }, []);
+
+  if (access === "checking") {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-center text-slate-300">
+        Đang kiểm tra thiết bị...
+      </div>
+    );
+  }
+
+  if (access === "desktop-mode" || access === "portrait") {
+    const message = access === "desktop-mode"
+      ? 'hãy tắt tính năng "Trang cho máy tính" để tiếp tục'
+      : "hãy xoay ngang máy để tiếp tục";
+
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center rounded-3xl border border-amber-400/30 bg-slate-900/80 p-8 text-center shadow-2xl">
+        <p className="text-xl font-semibold text-amber-200">{message}</p>
+      </div>
+    );
+  }
+
+  return children;
+}
 
 export default function HomePage() {
   const router = useRouter();
@@ -387,7 +440,9 @@ export default function HomePage() {
           {walletLoading ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-slate-300">Đang tải số dư...</div>
           ) : activeMenu === "Sòng bạc" ? (
-            <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
+            <MobileGameAccess>
+              <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
+            </MobileGameAccess>
           ) : activeMenu === "Ví" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">

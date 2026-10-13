@@ -5,11 +5,6 @@ import { hasPasswordDiacritics } from "@/lib/password-validation";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
-  const rateLimit = await checkRateLimit(req, "1/hour");
-  if (!rateLimit.success) {
-    return rateLimitResponse(rateLimit.retryAfter, "Bạn chỉ có thể đăng ký 1 tài khoản mỗi giờ từ IP này.");
-  }
-
   try {
     const rawBody = await req.text();
     const body = rawBody ? JSON.parse(rawBody) : {};
@@ -49,6 +44,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const rateLimitOptions = { consume: false, identifierSuffix: "successful-signup" };
+    const rateLimit = await checkRateLimit(req, "1/hour", rateLimitOptions);
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit.retryAfter, "Bạn chỉ có thể đăng ký 1 tài khoản mỗi giờ từ IP này.");
+    }
+
     const user = {
       id: crypto.randomUUID(),
       username,
@@ -61,7 +62,8 @@ export async function POST(req: NextRequest) {
     };
 
     await createUser(user);
-    
+    await checkRateLimit(req, "1/hour", { identifierSuffix: "successful-signup" });
+
     if (deviceId) {
       await addDeviceAccount(deviceId, username);
     }
