@@ -401,7 +401,8 @@ export default function HomePage() {
 
   if (isAuthenticated) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white">
+      <DeviceAccessGate>
+        <main className="min-h-screen bg-slate-950 text-white">
         <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl">
           <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
             <div className="flex items-center gap-4">
@@ -440,9 +441,7 @@ export default function HomePage() {
           {walletLoading ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-slate-300">Đang tải số dư...</div>
           ) : activeMenu === "Sòng bạc" ? (
-            <DeviceAccessGate>
-              <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
-            </DeviceAccessGate>
+            <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
           ) : activeMenu === "Ví" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -658,7 +657,8 @@ export default function HomePage() {
           )}
         </section>
         <SimulationDisclaimer />
-      </main>
+        </main>
+      </DeviceAccessGate>
     );
   }
 
