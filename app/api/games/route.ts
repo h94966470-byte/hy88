@@ -1,7 +1,14 @@
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
-import { getGameRoundCount, getRecentGameRounds, resolveGameRound, StoredGameRound } from "@/lib/store";
+import {
+  getGameRoundCount,
+  getRecentGameRounds,
+  prepareGameRound,
+  resolveGameRound,
+  settlePreparedGameRound,
+  StoredGameRound,
+} from "@/lib/store";
 
 const getUserId = async () => {
   const session = await getServerSession(authOptions);
@@ -25,7 +32,23 @@ export async function POST(req: NextRequest) {
   if (!userId || userId === "guest") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const body = (await req.json()) as { amount?: number; betType?: string; wagerMode?: string; selectedNumber?: number | null; playerChoice?: string | null };
+    const body = (await req.json()) as {
+      action?: "prepare" | "settle";
+      pendingId?: string;
+      amount?: number;
+      betType?: string;
+      wagerMode?: string;
+      selectedNumber?: number | null;
+      playerChoice?: string | null;
+    };
+    if (body.action === "settle") {
+      if (!body.pendingId || !/^[0-9a-f-]{36}$/i.test(body.pendingId)) {
+        return NextResponse.json({ error: "Ván chơi không hợp lệ hoặc đã hết hạn" }, { status: 400 });
+      }
+      const game = await settlePreparedGameRound(userId, body.pendingId);
+      return NextResponse.json({ ok: true, ...game });
+    }
+
     const amount = body.amount;
     const selectedNumber = body.selectedNumber;
     if (typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0 ||
@@ -38,6 +61,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Dữ liệu ván chơi không hợp lệ" }, { status: 400 });
     }
 
+    if (body.action === "prepare") {
+      if (body.wagerMode !== "tai-xiu") {
+        return NextResponse.json({ error: "Chỉ hỗ trợ chuẩn bị kết quả cho Tài Xỉu" }, { status: 400 });
+      }
+      const prepared = await prepareGameRound(
+        userId,
+        amount,
+        body.betType as "custom" | "half" | "all",
+        body.wagerMode as StoredGameRound["wagerMode"],
+        selectedNumber ?? null,
+        body.playerChoice as "tai" | "xiu" | null,
+      );
+      return NextResponse.json({ ok: true, id: prepared.id, dice: prepared.dice });
+    }
+
     const game = await resolveGameRound(userId, amount, body.betType as "custom" | "half" | "all", body.wagerMode as StoredGameRound["wagerMode"], selectedNumber ?? null, body.playerChoice as "tai" | "xiu" | null);
     return NextResponse.json({ ok: true, wallet: game.wallet, round: game.round, profit: game.profit, interestDebt: game.interestDebt });
   } catch (error) {
@@ -47,6 +85,9 @@ export async function POST(req: NextRequest) {
     }
     if (error instanceof Error && error.message === "INVALID_BET_AMOUNT") {
       return NextResponse.json({ error: "Số tiền cược không hợp lệ hoặc số dư đã thay đổi" }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "PREPARED_GAME_ROUND_INVALID") {
+      return NextResponse.json({ error: "Số dư đã thay đổi hoặc ván chơi đã hết hạn. Vui lòng đặt cược lại." }, { status: 409 });
     }
     return NextResponse.json({ error: "Không thể lưu ván chơi" }, { status: 500 });
   }

@@ -532,6 +532,181 @@ export async function resolveGameRound(
   return { wallet: nextWallet, round, profit: won ? Math.floor(expectedAmount * multiplier) : -expectedAmount, interestDebt };
 }
 
+export async function prepareGameRound(
+  userId: string,
+  amount: number,
+  betType: "custom" | "half" | "all",
+  wagerMode: StoredGameRound["wagerMode"],
+  selectedNumber: number | null,
+  playerChoice: "tai" | "xiu" | null,
+): Promise<{ id: string; dice: number[] }> {
+  await ensureDatabaseReady();
+  const wallet = await getOrCreateWallet(userId);
+  const expectedAmount = betType === "all" ? wallet.balance : betType === "half" ? Math.floor(wallet.balance / 2) : amount;
+  if (!Number.isSafeInteger(expectedAmount) || expectedAmount <= 0 || expectedAmount > wallet.balance ||
+      (betType === "custom" && amount !== expectedAmount)) {
+    throw new Error("INVALID_BET_AMOUNT");
+  }
+
+  const { customRate } = await getAppSettings();
+  const winRate = getFinalWinRate(customRate, wallet.balance, wallet.winStreak, wallet.lossStreak);
+  const forcedWin = typeof customRate === "number"
+    ? customRate === 0
+      ? false
+      : customRate === 1
+        ? true
+        : crypto.randomInt(0, 10000) < Math.floor(winRate * 10000)
+    : null;
+  const dice: [number, number, number] = typeof customRate === "number" && wagerMode === "tai-xiu" && playerChoice
+    ? generateDice((forcedWin ? playerChoice : playerChoice === "tai" ? "xiu" : "tai").toUpperCase() as "TAI" | "XIU")
+    : [crypto.randomInt(1, 7), crypto.randomInt(1, 7), crypto.randomInt(1, 7)];
+  const total = dice[0] + dice[1] + dice[2];
+  const result = total > 10 ? "tai" : "xiu";
+  const triple = dice[0] === dice[1] && dice[1] === dice[2];
+  const selectedCount = selectedNumber ? dice.filter((die) => die === selectedNumber).length : 0;
+  const multiplier = betType === "all" ? 2 : betType === "half" ? 1.5 : 1;
+  let won = false;
+  let payoutMultiplier = 0;
+
+  if (wagerMode === "tai-xiu") {
+    won = !triple && playerChoice === result;
+    payoutMultiplier = multiplier;
+  } else if (wagerMode === "triple") {
+    won = triple && dice[0] === selectedNumber;
+    payoutMultiplier = 150;
+  } else if (wagerMode === "pair") {
+    won = !triple && selectedCount === 2;
+    payoutMultiplier = 10;
+  } else if (wagerMode === "total") {
+    won = total === selectedNumber;
+    payoutMultiplier = 8;
+  } else {
+    won = selectedCount > 0;
+    payoutMultiplier = selectedCount;
+  }
+  if (forcedWin !== null) won = forcedWin;
+
+  const profit = won ? Math.floor(expectedAmount * payoutMultiplier) : -expectedAmount;
+  const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * 0.2) : 0;
+  let balanceDelta = profit;
+  let debtDelta = interestDebt;
+  const nextBalance = wallet.balance + balanceDelta;
+  if (nextBalance < 0) {
+    debtDelta += Math.abs(nextBalance);
+    balanceDelta = -wallet.balance;
+  }
+
+  const round: StoredGameRound = {
+    result,
+    playerChoice: playerChoice ?? result,
+    won,
+    wagerMode,
+    selectedNumber,
+    total,
+    dice,
+  };
+  const id = crypto.randomUUID();
+  await sql`DELETE FROM pending_game_rounds WHERE user_id = ${userId} AND created_at < CURRENT_TIMESTAMP - INTERVAL '10 minutes'`;
+  await sql`
+    INSERT INTO pending_game_rounds (
+      id, user_id, expected_balance, expected_debt, balance_delta, debt_delta,
+      result, player_choice, won, wager_mode, selected_number, total,
+      dice_1, dice_2, dice_3, profit, interest_debt
+    )
+    VALUES (
+      ${id}, ${userId}, ${wallet.balance}, ${wallet.debt}, ${balanceDelta}, ${debtDelta},
+      ${round.result}, ${round.playerChoice}, ${round.won}, ${round.wagerMode}, ${round.selectedNumber},
+      ${round.total}, ${round.dice[0]}, ${round.dice[1]}, ${round.dice[2]}, ${profit}, ${interestDebt}
+    )
+  `;
+  return { id, dice: round.dice };
+}
+
+export async function settlePreparedGameRound(
+  userId: string,
+  pendingId: string,
+): Promise<{ wallet: StoredWallet; round: StoredGameRound; profit: number; interestDebt: number }> {
+  await ensureDatabaseReady();
+  const roundId = crypto.randomUUID();
+  const result = await sql`
+    WITH pending AS (
+      DELETE FROM pending_game_rounds
+      WHERE id = ${pendingId}
+        AND user_id = ${userId}
+        AND created_at >= CURRENT_TIMESTAMP - INTERVAL '10 minutes'
+      RETURNING *
+    ),
+    updated AS (
+      UPDATE user_wallets AS wallet
+      SET balance = wallet.balance + pending.balance_delta,
+          debt = wallet.debt + pending.debt_delta,
+          updated_at = CURRENT_TIMESTAMP
+      FROM pending
+      WHERE wallet.user_id = pending.user_id
+        AND wallet.balance = pending.expected_balance
+        AND wallet.debt = pending.expected_debt
+        AND wallet.balance + pending.balance_delta >= 0
+        AND wallet.debt + pending.debt_delta >= 0
+      RETURNING wallet.balance, wallet.debt, wallet.win_streak, wallet.loss_streak,
+        wallet.daily_claim_date, wallet.newbie_step, wallet.newbie_daily_claim_date, wallet.created_at
+    ),
+    inserted AS (
+      INSERT INTO game_rounds (
+        id, user_id, result, player_choice, won, wager_mode, selected_number,
+        total, dice_1, dice_2, dice_3
+      )
+      SELECT ${roundId}, pending.user_id, pending.result, pending.player_choice, pending.won,
+        pending.wager_mode, pending.selected_number, pending.total, pending.dice_1,
+        pending.dice_2, pending.dice_3
+      FROM pending
+      INNER JOIN updated ON TRUE
+      RETURNING id
+    )
+    SELECT updated.balance, updated.debt, updated.win_streak, updated.loss_streak,
+      updated.daily_claim_date, updated.newbie_step, updated.newbie_daily_claim_date,
+      updated.created_at, pending.result, pending.player_choice, pending.won,
+      pending.wager_mode, pending.selected_number, pending.total, pending.dice_1,
+      pending.dice_2, pending.dice_3, pending.profit, pending.interest_debt
+    FROM pending
+    INNER JOIN updated ON TRUE
+    INNER JOIN inserted ON TRUE
+  `;
+  if (!result.rows.length) {
+    throw new Error("PREPARED_GAME_ROUND_INVALID");
+  }
+
+  const row = result.rows[0] as {
+    balance: number; debt: number; win_streak: number; loss_streak: number;
+    daily_claim_date: string | null; newbie_step: number; newbie_daily_claim_date: string | null; created_at: string;
+    result: "tai" | "xiu"; player_choice: "tai" | "xiu"; won: boolean;
+    wager_mode: StoredGameRound["wagerMode"]; selected_number: number | null; total: number;
+    dice_1: number; dice_2: number; dice_3: number; profit: number; interest_debt: number;
+  };
+  return {
+    wallet: mapWallet({
+      balance: row.balance,
+      debt: row.debt,
+      win_streak: row.win_streak,
+      loss_streak: row.loss_streak,
+      daily_claim_date: row.daily_claim_date,
+      newbie_step: row.newbie_step,
+      newbie_daily_claim_date: row.newbie_daily_claim_date,
+      created_at: row.created_at,
+    } as WalletRow),
+    round: {
+      result: row.result,
+      playerChoice: row.player_choice,
+      won: row.won,
+      wagerMode: row.wager_mode,
+      selectedNumber: row.selected_number,
+      total: row.total,
+      dice: [row.dice_1, row.dice_2, row.dice_3],
+    },
+    profit: Number(row.profit),
+    interestDebt: Number(row.interest_debt),
+  };
+}
+
 export async function getRecentGameRounds(limit = 30): Promise<StoredGameRound[]> {
   await ensureDatabaseReady();
   const result = await sql`

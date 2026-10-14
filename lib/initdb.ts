@@ -141,6 +141,29 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_game_rounds_created_at ON game_rounds(created_at DESC);
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS pending_game_rounds (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expected_balance BIGINT NOT NULL,
+        expected_debt BIGINT NOT NULL,
+        balance_delta BIGINT NOT NULL,
+        debt_delta BIGINT NOT NULL,
+        result VARCHAR(3) NOT NULL CHECK (result IN ('tai', 'xiu')),
+        player_choice VARCHAR(3) NOT NULL CHECK (player_choice IN ('tai', 'xiu')),
+        won BOOLEAN NOT NULL,
+        wager_mode VARCHAR(20) NOT NULL,
+        selected_number INTEGER,
+        total INTEGER NOT NULL,
+        dice_1 INTEGER NOT NULL,
+        dice_2 INTEGER NOT NULL,
+        dice_3 INTEGER NOT NULL,
+        profit BIGINT NOT NULL,
+        interest_debt BIGINT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
     console.log("✅ Database initialized successfully");
   } catch (error) {
     console.error("❌ Database initialization error:", error);

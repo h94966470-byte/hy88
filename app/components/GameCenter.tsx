@@ -38,6 +38,7 @@ type PendingBet = {
   wagerMode: WagerMode;
   selectedNumber: number;
   choice?: "tai" | "xiu";
+  pendingId?: string;
 };
 
 const diePips: Record<number, number[]> = {
@@ -309,13 +310,15 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       gameResponse = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: bet.amount,
-          betType: bet.betType,
-          wagerMode: bet.wagerMode,
-          selectedNumber: bet.wagerMode === "tai-xiu" ? null : bet.selectedNumber,
-          playerChoice: bet.choice ?? null,
-        }),
+        body: JSON.stringify(bet.pendingId
+          ? { action: "settle", pendingId: bet.pendingId }
+          : {
+              amount: bet.amount,
+              betType: bet.betType,
+              wagerMode: bet.wagerMode,
+              selectedNumber: bet.wagerMode === "tai-xiu" ? null : bet.selectedNumber,
+              playerChoice: bet.choice ?? null,
+            }),
       });
       gameData = await gameResponse.json() as typeof gameData;
     } catch {
@@ -405,8 +408,44 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
       setCountdown(0);
-      setRolling(false);
-      setMessage("Kéo bát ra khỏi vòng tròn để xem kết quả.");
+      try {
+        const response = await fetch("/api/games", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "prepare",
+            amount: bet.amount,
+            betType: bet.betType,
+            wagerMode: bet.wagerMode,
+            selectedNumber: null,
+            playerChoice: bet.choice,
+          }),
+        });
+        const data = await response.json() as {
+          id?: string;
+          dice?: number[];
+          error?: string;
+        };
+        if (!response.ok || !data.id || !data.dice || data.dice.length !== 3 ||
+            data.dice.some((die) => !Number.isInteger(die) || die < 1 || die > 6)) {
+          setRolling(false);
+          setPlaying(false);
+          setPendingBet(null);
+          setHistoryBeforeRound(null);
+          setMessage(data.error || "Không thể chuẩn bị kết quả ván chơi. Vui lòng thử lại.");
+          return;
+        }
+        setRollingDice(data.dice);
+        setPendingBet({ ...bet, pendingId: data.id });
+        setRolling(false);
+        setMessage("Kéo bát ra khỏi vòng tròn để xem kết quả.");
+      } catch {
+        setRolling(false);
+        setPlaying(false);
+        setPendingBet(null);
+        setHistoryBeforeRound(null);
+        setMessage("Không thể kết nối để chuẩn bị kết quả ván chơi. Vui lòng thử lại.");
+      }
       return;
     }
 
@@ -585,14 +624,18 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
           {playing && !rolling && wagerMode === "tai-xiu" && pendingBet && (
             <div className="space-y-3">
               <p aria-live="polite" className="text-center text-sm font-semibold text-amber-200">
-                {revealingResult ? "Đang mở bát..." : "Kéo bát ra khỏi vòng tròn theo bất kỳ hướng nào."}
+                {revealingResult
+                  ? "Đang mở bát..."
+                  : pendingBet.pendingId
+                    ? "Kéo bát ra khỏi vòng tròn theo bất kỳ hướng nào."
+                    : "Đang tính kết quả..."}
               </p>
               <TaiXiuBoard
                 disabled
                 dice={rollingDice}
                 bowlCovered
-                bowlInteractive={!revealingResult}
-                onReveal={() => settleBet(pendingBet)}
+                bowlInteractive={Boolean(pendingBet.pendingId) && !revealingResult}
+                onReveal={pendingBet.pendingId ? () => settleBet(pendingBet) : undefined}
               />
             </div>
           )}
@@ -626,8 +669,11 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
               )}
 
               {gameResult.wagerMode === "tai-xiu" && (
-                <p aria-live="polite" className="text-sm text-amber-200">
-                  {resultRevealed ? message : "Nhấn giữ và kéo bát lên để mở kết quả."}
+                <p
+                  aria-live="polite"
+                  className={`text-sm font-bold ${resultRevealed ? gameResult.won ? "text-emerald-300" : "text-red-300" : "text-amber-200"}`}
+                >
+                  {resultRevealed ? gameResult.won ? "THẮNG" : "THUA" : "Nhấn giữ và kéo bát lên để mở kết quả."}
                 </p>
               )}
 
