@@ -336,24 +336,30 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
               <div className="grid gap-3 md:grid-cols-3">
                 <button
+                  type="button"
                   onClick={() => setBetType("custom")}
-                  className={`rounded-xl border px-4 py-2 font-bold transition text-sm ${
+                  style={{ animationDelay: "0ms" }}
+                  className={`auth-field auth-btn rounded-xl border px-4 py-2 font-bold transition text-sm ${
                     betType === "custom" ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
                   Tùy chỉnh ({betAmount || "0"}K)
                 </button>
                 <button
+                  type="button"
                   onClick={() => setBetType("half")}
-                  className={`rounded-xl border px-4 py-2 font-bold transition text-sm ${
+                  style={{ animationDelay: "60ms" }}
+                  className={`auth-field auth-btn rounded-xl border px-4 py-2 font-bold transition text-sm ${
                     betType === "half" ? "border-blue-400/60 bg-blue-500/20 text-blue-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
                   Nửa ({Math.floor(actualBalance / 2)}K) x{MULTIPLIER_HALF}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setBetType("all")}
-                  className={`rounded-xl border px-4 py-2 font-bold transition text-sm ${
+                  style={{ animationDelay: "120ms" }}
+                  className={`auth-field auth-btn rounded-xl border px-4 py-2 font-bold transition text-sm ${
                     betType === "all" ? "border-red-400/60 bg-red-500/20 text-red-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
@@ -368,16 +374,17 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   ["pair", "Cặp"],
                   ["total", "Tổng điểm"],
                   ["single", "Số đơn lẻ"],
-                ] as const).map(([mode, label]) => (
+                ] as const).map(([mode, label], index) => (
                   <button
                     key={mode}
                     type="button"
+                    style={{ animationDelay: `${index * 60}ms` }}
                     onClick={() => {
                       setWagerMode(mode);
                       if (mode === "total" && selectedNumber < 4) setSelectedNumber(4);
                       if (mode !== "total" && selectedNumber > 6) setSelectedNumber(1);
                     }}
-                    className={`rounded-xl border px-3 py-2 text-sm font-bold transition ${
+                    className={`auth-field auth-btn rounded-xl border px-3 py-2 text-sm font-bold transition ${
                       wagerMode === mode
                         ? "border-amber-400/60 bg-amber-500/20 text-amber-200"
                         : "border-slate-500/40 bg-slate-800/50 text-slate-300"

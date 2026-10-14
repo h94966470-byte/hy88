@@ -409,11 +409,12 @@ export default function HomePage() {
             <div className="flex items-center gap-4">
               <div className="text-xl font-bold text-amber-400">HY88</div>
               <nav aria-label="Điều hướng chính" className="hidden items-center gap-6 text-sm text-slate-300 md:flex">
-                {menuItems.map((item) => (
+                {menuItems.map((item, index) => (
                   <button
                     key={item}
                     type="button"
-                    className={`transition ${activeMenu === item ? "text-white" : "hover:text-white"}`}
+                    style={{ animationDelay: `${index * 60}ms` }}
+                    className={`auth-field auth-btn rounded-lg border px-3 py-2 transition ${activeMenu === item ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
                     onClick={() => setActiveMenu(item)}
                   >
                     {item}
@@ -457,11 +458,12 @@ export default function HomePage() {
               aria-label="Điều hướng điện thoại"
               className={`${isMobileMenuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm text-slate-300 md:hidden`}
             >
-              {menuItems.map((item) => (
+              {menuItems.map((item, index) => (
                 <button
                   key={item}
                   type="button"
-                  className={`rounded-lg px-3 py-2 text-left transition ${activeMenu === item ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white"}`}
+                  style={{ animationDelay: `${index * 60}ms` }}
+                  className={`auth-field auth-btn rounded-lg border px-3 py-2 text-left transition ${activeMenu === item ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
                   onClick={() => {
                     setActiveMenu(item);
                     setIsMobileMenuOpen(false);
