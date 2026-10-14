@@ -487,6 +487,31 @@ export default function HomePage() {
     setMessage(`Đã trả ${amount.toLocaleString("vi-VN")} VND tiền nợ.`);
   };
 
+  const handleQuickRepay = async (portion: "half" | "all") => {
+    if (!wallet || wallet.debt <= 0) return;
+
+    const amount = portion === "all" ? wallet.debt : Math.ceil(wallet.debt / 2);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "repay", amount }),
+      });
+      const data = (await res.json()) as { wallet?: WalletState; error?: string };
+      if (!res.ok || !data.wallet) {
+        setMessage(data.error || "Không thể trả nợ");
+        return;
+      }
+      setWallet(data.wallet);
+      setMessage(`Đã trả ${portion === "all" ? "hết" : "một nửa"} số nợ (${amount.toLocaleString("vi-VN")} VND).`);
+    } catch {
+      setMessage("Không thể kết nối để trả nợ.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignup = async () => {
     if (!username.trim() || !password.trim()) {
       setMessage("Vui lòng nhập username và mật khẩu");
@@ -725,27 +750,37 @@ export default function HomePage() {
               </div>
 
               <div className="mt-6 grid gap-4 lg:grid-cols-3">
-                <button
-                  type="button"
-                  onClick={handleDailyBonus}
-                  disabled={loading}
-                  className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-left transition hover:bg-amber-500/15 disabled:opacity-50"
-                >
-                  <p className="text-sm text-amber-200">Daily</p>
-                  <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
-                  <p className="mt-2 text-sm text-slate-300">Nhận mỗi ngày, reset 00:00 ngày mai.</p>
-                </button>
+                <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5">
+                  <button type="button" onClick={handleDailyBonus} disabled={loading} className="w-full text-left transition disabled:opacity-50">
+                    <p className="text-sm text-amber-200">Daily</p>
+                    <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
+                    <p className="mt-2 text-sm text-slate-300">Nhận mỗi ngày, reset 00:00 ngày mai.</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleQuickRepay("half")}
+                    disabled={loading || !wallet?.debt}
+                    className="mt-4 w-full rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-center font-semibold text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Trả nửa nợ
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleBorrow}
-                  disabled={loading}
-                  className="rounded-2xl border border-red-400/40 bg-red-500/10 p-5 text-left transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <p className="text-sm text-red-200">Vay nợ</p>
-                  <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
-                  <p className="mt-2 text-sm text-slate-300">Tối đa 2.000.000 VND tiền nợ.</p>
-                </button>
+                <div className="rounded-2xl border border-red-400/40 bg-red-500/10 p-5">
+                  <button type="button" onClick={handleBorrow} disabled={loading} className="w-full text-left transition disabled:opacity-50">
+                    <p className="text-sm text-red-200">Vay nợ</p>
+                    <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
+                    <p className="mt-2 text-sm text-slate-300">Tối đa 2.000.000 VND tiền nợ.</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleQuickRepay("all")}
+                    disabled={loading || !wallet?.debt}
+                    className="mt-4 w-full rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-center font-semibold text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Trả hết nợ
+                  </button>
+                </div>
 
                 <button
                   type="button"
