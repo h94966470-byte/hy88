@@ -103,7 +103,7 @@ function SimulationDisclaimer() {
       type="button"
       onClick={dismiss}
       aria-label="Đóng thông báo"
-      className="simulation-disclaimer fixed inset-0 z-[100] flex cursor-pointer items-start justify-center bg-black/75 px-4 pt-[10vh] text-center backdrop-blur-sm"
+      className="simulation-disclaimer-overlay fixed inset-0 z-[100] flex w-full cursor-pointer items-start justify-center bg-black/75 px-4 pt-[10vh] text-center backdrop-blur-sm"
     >
       <span className="w-full max-w-2xl rounded-2xl border border-amber-400/40 bg-slate-950 px-6 py-7 text-base leading-relaxed text-slate-200 shadow-[0_24px_80px_rgba(0,0,0,0.75)] sm:px-10 sm:py-9 sm:text-lg">
         <span className="block">Mọi thứ trên web này đều là giả lập, không quy đổi ra tiền mặt, không cổ xúy chơi cờ bạc, đỏ đen.</span>
