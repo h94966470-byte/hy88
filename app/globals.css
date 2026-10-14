@@ -179,6 +179,28 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+@keyframes balanceChangeFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-28px) scale(1.04);
+  }
+}
+
+.balance-change {
+  animation: balanceChangeFloat 1.35s ease-out forwards;
+}
+
 @media (pointer: coarse) and (hover: none) {
   .simulation-disclaimer {
     right: 4px;
@@ -204,5 +226,9 @@ body {
   .auth-mode-indicator {
     animation: none !important;
     transition: none !important;
+  }
+
+  .balance-change {
+    animation: none !important;
   }
 }

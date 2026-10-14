@@ -2,7 +2,7 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { hasPasswordDiacritics } from "@/lib/password-validation";
 import GameCenter from "./components/GameCenter";
 
@@ -167,6 +167,9 @@ export default function HomePage() {
   const [walletLoading, setWalletLoading] = useState(false);
   const [repaymentAmount, setRepaymentAmount] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [balanceChange, setBalanceChange] = useState<{ id: number; amount: number } | null>(null);
+  const balanceChangeId = useRef(0);
+  const balanceChangeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
@@ -233,20 +236,32 @@ export default function HomePage() {
     };
   }, [isAuthenticated]);
 
+  useEffect(() => () => {
+    if (balanceChangeTimeout.current) clearTimeout(balanceChangeTimeout.current);
+  }, []);
+
+  const showBalanceChange = (amount: number) => {
+    if (!amount) return;
+    if (balanceChangeTimeout.current) clearTimeout(balanceChangeTimeout.current);
+    setBalanceChange({ id: ++balanceChangeId.current, amount });
+    balanceChangeTimeout.current = setTimeout(() => setBalanceChange(null), 1400);
+  };
+
   const handleGameWalletUpdate = (newBalance: number, newDebt: number): Promise<boolean> => {
     if (!wallet) return Promise.resolve(false);
+    showBalanceChange(newBalance - wallet.balance);
     setWallet((current) => current ? { ...current, balance: newBalance, debt: newDebt } : current);
     return Promise.resolve(true);
   };
 
-  const claimBonus = async () => {
+  const claimBonus = async (action: "daily" | "newbie") => {
     if (!wallet) return;
     const todayKey = formatDateKey(new Date());
     setLoading(true);
     const res = await fetch("/api/wallet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "daily", dateKey: todayKey }),
+      body: JSON.stringify({ action, dateKey: todayKey }),
     });
     const data = (await res.json()) as { wallet?: WalletState; error?: string };
     setLoading(false);
@@ -254,11 +269,29 @@ export default function HomePage() {
       setMessage(data.error || "Không thể đồng bộ dữ liệu");
       return;
     }
+    showBalanceChange(data.wallet.balance - wallet.balance);
     setWallet(data.wallet);
-    setMessage("Bạn đã nhận 50.000 VND từ Daily.");
+    setMessage(action === "daily" ? "Bạn đã nhận 50.000 VND từ Daily." : "Bạn đã nhận Daily người mới.");
   };
 
-  const handleDailyBonus = () => void claimBonus();
+  const handleDailyBonus = () => void claimBonus("daily");
+
+  const handleNewUserDaily = () => {
+    if (!wallet) return;
+    const todayKey = formatDateKey(new Date());
+
+    if (wallet.newbieStep >= 7) {
+      setMessage("Bạn đã hoàn tất Daily người mới.");
+      return;
+    }
+
+    if (wallet.newbieDailyClaimDate === todayKey) {
+      setMessage("Bạn đã nhận Daily người mới hôm nay rồi.");
+      return;
+    }
+
+    void claimBonus("newbie");
+  };
 
   const handleBorrow = async () => {
     setLoading(true);
@@ -388,16 +421,36 @@ export default function HomePage() {
       <DeviceAccessGate>
         <main className="min-h-screen bg-slate-950 text-white">
         <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-900/95 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-3 px-4 py-3 sm:px-6">
-            <button
-              type="button"
-              className="text-xl font-bold text-amber-400"
-              onClick={() => setActiveMenu("Trang chủ")}
-            >
-              HY88
-            </button>
+          <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(180px,1fr)_auto] sm:px-6">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                type="button"
+                className="shrink-0 text-lg font-bold text-amber-400 sm:text-xl"
+                onClick={() => setActiveMenu("Trang chủ")}
+              >
+                HY88
+              </button>
+              <span className="max-w-[88px] truncate rounded-md border border-red-400/40 bg-red-500/10 px-2 py-1 text-xs font-semibold text-red-100 sm:max-w-[150px] sm:text-sm">
+                {session.user?.name || "Người chơi"}
+              </span>
+            </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative col-span-2 row-start-2 flex min-h-10 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:min-h-11">
+              <span className="truncate text-sm font-bold tabular-nums text-emerald-200 sm:text-base">
+                {wallet ? wallet.balance.toLocaleString("vi-VN") : "—"} VND
+              </span>
+              {balanceChange && (
+                <span
+                  key={balanceChange.id}
+                  aria-live="polite"
+                  className={`balance-change absolute -top-2 right-3 z-10 whitespace-nowrap text-sm font-black drop-shadow-lg ${balanceChange.amount > 0 ? "text-emerald-300" : "text-red-300"}`}
+                >
+                  {balanceChange.amount > 0 ? "+" : "−"}{Math.abs(balanceChange.amount).toLocaleString("vi-VN")} VND
+                </span>
+              )}
+            </div>
+
+            <div className="col-start-2 row-start-1 flex items-center justify-end gap-1.5 sm:col-start-3 sm:row-start-1 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setIsMobileMenuOpen((open) => !open)}
@@ -447,9 +500,9 @@ export default function HomePage() {
                 type="button"
                 onClick={() => void handleLogout()}
                 disabled={loading}
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition hover:bg-white/10 sm:px-4"
+                className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-xs transition hover:bg-white/10 sm:px-4 sm:text-sm"
               >
-                {loading ? "Đang thoát..." : "Đăng xuất"}
+                {loading ? "Thoát..." : "Đăng xuất"}
               </button>
             </div>
 
@@ -514,6 +567,25 @@ export default function HomePage() {
                   <p className="text-sm text-red-200">Vay nợ</p>
                   <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
                   <p className="mt-2 text-sm text-slate-300">Tối đa 2.000.000 VND tiền nợ.</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleNewUserDaily}
+                  disabled={loading || (wallet?.newbieStep ?? 0) >= 7}
+                  className="rounded-2xl border border-violet-400/40 bg-violet-500/10 p-5 text-left transition hover:bg-violet-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <p className="text-sm text-violet-200">Daily người mới</p>
+                  <p className="mt-2 text-2xl font-bold text-white">
+                    {(wallet?.newbieStep ?? 0) >= 7
+                      ? "Hoàn thành"
+                      : `+${[300000, 200000, 100000, 100000, 100000, 100000, 100000][wallet?.newbieStep ?? 0].toLocaleString("vi-VN")} VND`}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-300">
+                    {wallet && wallet.newbieStep >= 7
+                      ? "Bạn đã hoàn tất 7 ngày."
+                      : "Ngày 1: 300k • Ngày 2: 200k • Ngày 3-7: 100k"}
+                  </p>
                 </button>
 
                 <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-5">

@@ -217,9 +217,10 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
   const [rollingDice, setRollingDice] = useState([2, 4, 6]);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [resultRevealed, setResultRevealed] = useState(false);
-  const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [roundHistory, setRoundHistory] = useState<RoundPoint[]>([]);
+  const [historyBeforeRound, setHistoryBeforeRound] = useState<RoundPoint[] | null>(null);
   const [totalRounds, setTotalRounds] = useState(0);
 
   useEffect(() => {
@@ -256,17 +257,18 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
   }, [rolling, wagerMode]);
 
   useEffect(() => {
-    if (!isResultPopupOpen) return;
+    if (!isHistoryOpen) return;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsResultPopupOpen(false);
+      if (event.key === "Escape") setIsHistoryOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [isResultPopupOpen]);
+  }, [isHistoryOpen]);
 
   if (!wallet) return null;
 
   const actualBalance = wallet.balance;
+  const historyForPanel = historyBeforeRound ?? roundHistory;
 
   const rollGame = async (choice?: "tai" | "xiu") => {
     if (!betAmount && betType === "custom") {
@@ -285,8 +287,9 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     setPlaying(true);
     setRolling(true);
     setGameResult(null);
+    setHistoryBeforeRound(wagerMode === "tai-xiu" ? roundHistory : null);
     setResultRevealed(false);
-    setIsResultPopupOpen(false);
+    setIsHistoryOpen(false);
     setMessage("");
 
     if (wagerMode === "tai-xiu") {
@@ -321,6 +324,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       setRolling(false);
       setCountdown(0);
       setPlaying(false);
+      setHistoryBeforeRound(null);
       setMessage(gameData.error || "Không thể lưu kết quả ván chơi. Vui lòng thử lại.");
       return;
     }
@@ -328,6 +332,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     const dice = gameData.round.dice ?? [];
     await onWalletUpdate(gameData.wallet.balance, gameData.wallet.debt);
     setRoundHistory((current) => [...current, gameData.round!].slice(-30));
+    if (wagerMode !== "tai-xiu") setHistoryBeforeRound(null);
     setTotalRounds((current) => current + 1);
 
     setGameResult({
@@ -352,8 +357,8 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     setPlaying(false);
   };
 
-  const chartPoints = roundHistory.map((round, index) => {
-    const x = roundHistory.length === 1 ? 50 : (index / (roundHistory.length - 1)) * 100;
+  const chartPoints = historyForPanel.map((round, index) => {
+    const x = historyForPanel.length === 1 ? 50 : (index / (historyForPanel.length - 1)) * 100;
     const y = round.result === "tai" ? 22 : 78;
     return `${x},${y}`;
   });
@@ -381,10 +386,9 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
             </div>
             <button
               type="button"
-              onClick={() => setIsResultPopupOpen(true)}
-              disabled={!gameResult || (gameResult.wagerMode === "tai-xiu" && !resultRevealed)}
+              onClick={() => setIsHistoryOpen(true)}
               aria-label="Mở kết quả cầu"
-              className="rounded-xl border border-amber-400/50 bg-amber-500/10 px-4 py-2 text-sm font-bold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-xl border border-amber-400/50 bg-amber-500/10 px-4 py-2 text-sm font-bold text-amber-200 transition hover:bg-amber-500/20"
             >
               Cầu
             </button>
@@ -539,6 +543,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   bowlInteractive={!resultRevealed}
                   onReveal={() => {
                     setResultRevealed(true);
+                    setHistoryBeforeRound(null);
                     setMessage(
                       gameResult.triple
                         ? `Bộ ba đồng nhất: cả Tài và Xỉu đều thua. Tổng ${gameResult.total}.`
@@ -568,7 +573,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 onClick={() => {
                   setGameResult(null);
                   setResultRevealed(false);
-                  setIsResultPopupOpen(false);
+                  setIsHistoryOpen(false);
                   setBetAmount("");
                   setMessage("");
                 }}
@@ -587,82 +592,85 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
         </div>
       </div>
 
-      {/* Shared round chart */}
-      <div>
-        <div className="h-full min-h-[520px] rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl flex flex-col items-center justify-center text-center">
-          <p className="text-sm uppercase tracking-[0.24em] text-violet-300 mb-4">Biểu đồ các ván</p>
-
-          <div className="relative w-full aspect-[1.6] flex items-center justify-center mb-6 rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3">
-            <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" role="img" aria-label="Biểu đồ hình sin kết quả các ván">
-              <path d="M 0,50 H 100" stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 3" />
-              <path d={chartPath} fill="none" stroke="#c4b5fd" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-              {chartPoints.slice(-20).map((point, index) => {
-                const [x, y] = point.split(",");
-                return <circle key={`${point}-${index}`} cx={x} cy={y} r="1.6" fill="#fbbf24" />;
-              })}
-            </svg>
-          </div>
-
-          <div className="w-full space-y-2 text-sm">
-            <div className="flex justify-between text-slate-400">
-              <span>Phạm vi</span>
-              <span className="text-violet-300 font-bold">Tất cả người chơi</span>
-            </div>
-            <div className="flex justify-between text-slate-400">
-              <span>Tổng số ván</span>
-              <span className="font-bold text-white">{totalRounds}</span>
-            </div>
-          </div>
-
-          <p className="mt-6 text-xs text-slate-400">
-            TÀI ở đỉnh, XỈU ở đáy | Cập nhật theo từng ván
-          </p>
-        </div>
-      </div>
-      {isResultPopupOpen && gameResult && (
+      {isHistoryOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
-          onClick={() => setIsResultPopupOpen(false)}
+          onClick={() => setIsHistoryOpen(false)}
         >
           <section
             role="dialog"
             aria-modal="true"
-            aria-labelledby="game-result-title"
-            className="w-full max-w-lg space-y-5 rounded-3xl border border-amber-300/40 bg-slate-900 p-6 shadow-2xl sm:p-8"
+            aria-labelledby="game-history-title"
+            className="max-h-[90vh] w-full max-w-2xl space-y-5 overflow-y-auto rounded-3xl border border-amber-300/40 bg-slate-900 p-5 shadow-2xl sm:p-8"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm uppercase tracking-[0.2em] text-amber-300">Cầu</p>
-                <h2 id="game-result-title" className="mt-2 text-2xl font-bold text-white">Kết quả ván chơi</h2>
+                <h2 id="game-history-title" className="mt-2 text-2xl font-bold text-white">Lịch sử kết quả</h2>
               </div>
               <button
                 type="button"
-                onClick={() => setIsResultPopupOpen(false)}
-                aria-label="Đóng kết quả"
+                onClick={() => setIsHistoryOpen(false)}
+                aria-label="Đóng lịch sử"
                 className="rounded-lg border border-white/10 px-3 py-1 text-slate-300 hover:bg-white/10"
               >
                 ×
               </button>
             </div>
 
-            {gameResult.wagerMode === "tai-xiu" && (
-              <TaiXiuBoard disabled dice={gameResult.dice} result={gameResult.result} />
-            )}
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-center">
-              <p className="text-2xl font-bold text-white">
-                {gameResult.dice.join(" + ")} = {gameResult.total}
-              </p>
-              <p className="mt-2 text-amber-200">
-                {gameResult.triple && gameResult.wagerMode === "tai-xiu"
-                  ? "Bộ ba đồng nhất - cả Tài và Xỉu đều thua"
-                  : `Kết quả: ${gameResult.result === "tai" ? "TÀI" : "XỈU"}`}
-              </p>
-              <p className="mt-1 text-sm text-slate-300">Cược: {gameResult.wagerLabel}</p>
-              <p className={`mt-3 text-xl font-bold ${gameResult.won ? "text-emerald-300" : "text-red-300"}`}>
-                {gameResult.won ? "THẮNG +" : "THUA -"}{Math.abs(gameResult.profit).toLocaleString("vi-VN")} K
-              </p>
+            <div className="flex justify-between text-sm text-slate-400">
+              <span>Kết quả các ván</span>
+              <span className="font-bold text-white">{totalRounds} ván</span>
             </div>
+            <div className="relative flex aspect-[1.6] items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3">
+              <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" role="img" aria-label="Biểu đồ kết quả các ván">
+                <path d="M 0,50 H 100" stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 3" />
+                <path d={chartPath} fill="none" stroke="#c4b5fd" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                {chartPoints.slice(-20).map((point, index) => {
+                  const [x, y] = point.split(",");
+                  return <circle key={`${point}-${index}`} cx={x} cy={y} r="1.6" fill="#fbbf24" />;
+                })}
+              </svg>
+            </div>
+
+            <p className="text-center text-xs text-slate-400">TÀI ở đỉnh · XỈU ở đáy</p>
+            <div className="overflow-x-auto rounded-xl border border-white/10">
+              <table className="w-full min-w-[420px] text-left text-sm">
+                <thead className="bg-white/5 text-xs uppercase text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Xúc xắc</th>
+                    <th className="px-3 py-2 text-right">Tổng</th>
+                    <th className="px-3 py-2 text-right">Kết quả</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...historyForPanel].reverse().map((round, index) => (
+                    <tr key={`${totalRounds - index}-${round.total}`} className="border-t border-white/5 text-slate-200">
+                      <td className="px-3 py-2">{totalRounds - index}</td>
+                      <td className="px-3 py-2">{round.dice?.join(" · ") || "—"}</td>
+                      <td className="px-3 py-2 text-right">{round.total ?? "—"}</td>
+                      <td className={`px-3 py-2 text-right font-bold ${round.result === "tai" ? "text-amber-300" : "text-cyan-300"}`}>
+                        {round.result === "tai" ? "TÀI" : "XỈU"}
+                      </td>
+                    </tr>
+                  ))}
+                  {!historyForPanel.length && (
+                    <tr>
+                      <td colSpan={4} className="px-3 py-8 text-center text-slate-400">
+                        Chưa có kết quả ván chơi.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {gameResult && (gameResult.wagerMode !== "tai-xiu" || resultRevealed) && (
+              <p className="text-center text-sm text-slate-300">
+                Ván gần nhất: {gameResult.dice.join(" + ")} = {gameResult.total} · {gameResult.result === "tai" ? "TÀI" : "XỈU"}
+              </p>
+            )}
           </section>
         </div>
       )}
