@@ -14,7 +14,6 @@ type GameResult = {
   wagerMode: WagerMode;
 };
 
-const INTEREST_RATE = 0.2;
 const MULTIPLIER_ALL = 2.0;
 const MULTIPLIER_HALF = 1.5;
 const TRIPLE_MULTIPLIER = 150;
