@@ -167,9 +167,10 @@ export default function HomePage() {
   const [walletLoading, setWalletLoading] = useState(false);
   const [repaymentAmount, setRepaymentAmount] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [balanceChange, setBalanceChange] = useState<{ id: number; amount: number } | null>(null);
-  const balanceChangeId = useRef(0);
-  const balanceChangeTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [animatedBalance, setAnimatedBalance] = useState(0);
+  const animatedBalanceRef = useRef(0);
+  const hasInitializedBalance = useRef(false);
+  const balanceTarget = wallet?.balance;
 
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
@@ -236,20 +237,40 @@ export default function HomePage() {
     };
   }, [isAuthenticated]);
 
-  useEffect(() => () => {
-    if (balanceChangeTimeout.current) clearTimeout(balanceChangeTimeout.current);
-  }, []);
+  useEffect(() => {
+    if (balanceTarget === undefined) return;
+    const target = balanceTarget;
+    if (!hasInitializedBalance.current) {
+      hasInitializedBalance.current = true;
+      animatedBalanceRef.current = target;
+      setAnimatedBalance(target);
+      return;
+    }
+    if (target === animatedBalanceRef.current) return;
 
-  const showBalanceChange = (amount: number) => {
-    if (!amount) return;
-    if (balanceChangeTimeout.current) clearTimeout(balanceChangeTimeout.current);
-    setBalanceChange({ id: ++balanceChangeId.current, amount });
-    balanceChangeTimeout.current = setTimeout(() => setBalanceChange(null), 1400);
-  };
+    let frame = 0;
+    const start = performance.now();
+    const from = animatedBalanceRef.current;
+    const duration = 850;
+    const animate = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const easedProgress = 1 - (1 - progress) ** 3;
+      const value = Math.round(from + (target - from) * easedProgress);
+      animatedBalanceRef.current = value;
+      setAnimatedBalance(value);
+      if (progress < 1) {
+        frame = window.requestAnimationFrame(animate);
+      } else {
+        animatedBalanceRef.current = target;
+        setAnimatedBalance(target);
+      }
+    };
+    frame = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(frame);
+  }, [balanceTarget]);
 
   const handleGameWalletUpdate = (newBalance: number, newDebt: number): Promise<boolean> => {
     if (!wallet) return Promise.resolve(false);
-    showBalanceChange(newBalance - wallet.balance);
     setWallet((current) => current ? { ...current, balance: newBalance, debt: newDebt } : current);
     return Promise.resolve(true);
   };
@@ -269,7 +290,6 @@ export default function HomePage() {
       setMessage(data.error || "Không thể đồng bộ dữ liệu");
       return;
     }
-    showBalanceChange(data.wallet.balance - wallet.balance);
     setWallet(data.wallet);
     setMessage(action === "daily" ? "Bạn đã nhận 50.000 VND từ Daily." : "Bạn đã nhận Daily người mới.");
   };
@@ -435,19 +455,10 @@ export default function HomePage() {
               </span>
             </div>
 
-            <div className="relative col-span-2 row-start-2 flex min-h-10 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:min-h-11">
+            <div className="col-span-2 row-start-2 flex min-h-10 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:min-h-11">
               <span className="truncate text-sm font-bold tabular-nums text-emerald-200 sm:text-base">
-                {wallet ? wallet.balance.toLocaleString("vi-VN") : "—"} VND
+                {wallet ? animatedBalance.toLocaleString("vi-VN") : "—"} VND
               </span>
-              {balanceChange && (
-                <span
-                  key={balanceChange.id}
-                  aria-live="polite"
-                  className={`balance-change absolute -top-2 right-3 z-10 whitespace-nowrap text-sm font-black drop-shadow-lg ${balanceChange.amount > 0 ? "text-emerald-300" : "text-red-300"}`}
-                >
-                  {balanceChange.amount > 0 ? "+" : "−"}{Math.abs(balanceChange.amount).toLocaleString("vi-VN")} VND
-                </span>
-              )}
             </div>
 
             <div className="col-start-2 row-start-1 flex items-center justify-end gap-1.5 sm:col-start-3 sm:row-start-1 sm:gap-3">

@@ -32,6 +32,14 @@ type RoundPoint = {
   dice?: number[];
 };
 
+type PendingBet = {
+  amount: number;
+  betType: "custom" | "half" | "all";
+  wagerMode: WagerMode;
+  selectedNumber: number;
+  choice?: "tai" | "xiu";
+};
+
 const diePips: Record<number, number[]> = {
   1: [4],
   2: [0, 8],
@@ -59,9 +67,10 @@ function Die({ value, rolling = false }: { value: number; rolling?: boolean }) {
   );
 }
 
-function BowlCover({ onReveal, disabled = false }: { onReveal?: () => void; disabled?: boolean }) {
+function BowlCover({ onReveal, disabled = false }: { onReveal?: () => Promise<boolean>; disabled?: boolean }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [revealing, setRevealing] = useState(false);
   const pointerStart = useRef<{ pointerId: number; x: number; y: number } | null>(null);
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -81,10 +90,18 @@ function BowlCover({ onReveal, disabled = false }: { onReveal?: () => void; disa
     const y = event.clientY - start.y;
     setOffset({ x, y });
 
-    if (y <= -130) {
+    const circle = event.currentTarget.parentElement?.getBoundingClientRect();
+    const threshold = circle ? Math.min(circle.width, circle.height) / 2 : 90;
+    if (Math.hypot(x, y) >= threshold) {
       pointerStart.current = null;
       setDragging(false);
-      onReveal();
+      setRevealing(true);
+      void onReveal().then((success) => {
+        if (!success) {
+          setRevealing(false);
+          setOffset({ x: 0, y: 0 });
+        }
+      });
     }
   };
 
@@ -104,7 +121,7 @@ function BowlCover({ onReveal, disabled = false }: { onReveal?: () => void; disa
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
       disabled={disabled}
-      className={`absolute inset-[5%] z-10 flex touch-none select-none flex-col items-center justify-center rounded-full border-4 border-amber-100/70 text-amber-50 shadow-[inset_0_8px_18px_rgba(255,255,255,0.55),inset_0_-18px_22px_rgba(0,0,0,0.65),0_12px_22px_rgba(0,0,0,0.65)] disabled:cursor-default disabled:opacity-100 ${dragging ? "cursor-grabbing duration-0" : "cursor-grab transition-transform duration-300 ease-out"}`}
+      className={`absolute inset-[5%] z-10 flex touch-none select-none flex-col items-center justify-center rounded-full border-4 border-amber-100/70 text-amber-50 shadow-[inset_0_8px_18px_rgba(255,255,255,0.55),inset_0_-18px_22px_rgba(0,0,0,0.65),0_12px_22px_rgba(0,0,0,0.65)] transition-[transform,opacity] duration-300 ease-out disabled:cursor-default disabled:opacity-100 ${dragging ? "cursor-grabbing duration-0" : "cursor-grab"} ${revealing ? "pointer-events-none opacity-0" : "opacity-100"}`}
       style={{
         transform: `translate3d(${offset.x}px, ${offset.y}px, 0)`,
         backgroundImage: "radial-gradient(ellipse at 35% 25%, #fff0b8 0%, #c8a66d 24%, #766044 58%, #32271e 100%)",
@@ -136,7 +153,7 @@ function TaiXiuBoard({
   result?: "tai" | "xiu" | null;
   bowlCovered?: boolean;
   bowlInteractive?: boolean;
-  onReveal?: () => void;
+  onReveal?: () => Promise<boolean>;
 }) {
   return (
     <div className="rounded-2xl border border-amber-300/40 bg-amber-950/30 p-3 shadow-inner shadow-black/20 sm:p-5">
@@ -164,9 +181,15 @@ function TaiXiuBoard({
             ))}
           </div>
           {rolling && (
-            <span aria-live="polite" className="mt-1 text-lg font-black tabular-nums text-amber-200 sm:text-2xl">
-              {String(countdown ?? 0).padStart(2, "0")}
-            </span>
+            bowlCovered && (countdown ?? 0) > 0 ? (
+              <span aria-live="polite" className="absolute -top-8 left-1/2 z-20 -translate-x-1/2 rounded-full border border-amber-200/70 bg-slate-950/90 px-3 py-1 text-lg font-black tabular-nums text-amber-200 shadow-lg sm:text-2xl">
+                {String(countdown ?? 0).padStart(2, "0")}
+              </span>
+            ) : (
+              <span aria-live="polite" className="mt-1 text-lg font-black tabular-nums text-amber-200 sm:text-2xl">
+                {String(countdown ?? 0).padStart(2, "0")}
+              </span>
+            )
           )}
           {!rolling && !bowlCovered && (
             <span className="mt-1 text-[9px] font-bold uppercase tracking-wider text-amber-200 sm:text-[10px]">
@@ -215,6 +238,8 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
   const [rolling, setRolling] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [rollingDice, setRollingDice] = useState([2, 4, 6]);
+  const [pendingBet, setPendingBet] = useState<PendingBet | null>(null);
+  const [revealingResult, setRevealingResult] = useState(false);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [resultRevealed, setResultRevealed] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -270,6 +295,78 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
   const actualBalance = wallet.balance;
   const historyForPanel = historyBeforeRound ?? roundHistory;
 
+  const settleBet = async (bet: PendingBet): Promise<boolean> => {
+    setRevealingResult(true);
+    let gameResponse: Response;
+    let gameData: {
+      wallet?: { balance: number; debt: number };
+      round?: RoundPoint;
+      profit?: number;
+      interestDebt?: number;
+      error?: string;
+    };
+    try {
+      gameResponse = await fetch("/api/games", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: bet.amount,
+          betType: bet.betType,
+          wagerMode: bet.wagerMode,
+          selectedNumber: bet.wagerMode === "tai-xiu" ? null : bet.selectedNumber,
+          playerChoice: bet.choice ?? null,
+        }),
+      });
+      gameData = await gameResponse.json() as typeof gameData;
+    } catch {
+      setRolling(false);
+      setCountdown(0);
+      setRevealingResult(false);
+      setPlaying(bet.wagerMode === "tai-xiu");
+      if (bet.wagerMode !== "tai-xiu") setHistoryBeforeRound(null);
+      setMessage("Không thể kết nối để lưu kết quả ván chơi. Vui lòng thử lại.");
+      return false;
+    }
+    if (!gameResponse.ok || !gameData.wallet || !gameData.round) {
+      setRolling(false);
+      setCountdown(0);
+      setRevealingResult(false);
+      setPlaying(bet.wagerMode === "tai-xiu");
+      if (bet.wagerMode !== "tai-xiu") setHistoryBeforeRound(null);
+      setMessage(gameData.error || "Không thể lưu kết quả ván chơi. Vui lòng thử lại.");
+      return false;
+    }
+
+    const dice = gameData.round.dice ?? [];
+    await onWalletUpdate(gameData.wallet.balance, gameData.wallet.debt);
+    setRoundHistory((current) => [...current, gameData.round!].slice(-30));
+    setHistoryBeforeRound(null);
+    setTotalRounds((current) => current + 1);
+
+    setGameResult({
+      dice,
+      total: gameData.round.total || 0,
+      result: gameData.round.result,
+      playerChoice: gameData.round.playerChoice,
+      won: gameData.round.won,
+      triple: dice[0] === dice[1] && dice[1] === dice[2],
+      profit: gameData.profit || 0,
+      wagerLabel: bet.wagerMode === "tai-xiu" ? bet.choice === "tai" ? "Cửa Tài" : "Cửa Xỉu" : `${bet.wagerMode} ${bet.selectedNumber}`,
+      wagerMode: bet.wagerMode,
+    });
+    setResultRevealed(true);
+    setPendingBet(null);
+    setRolling(false);
+    setRevealingResult(false);
+    setMessage(bet.wagerMode === "tai-xiu"
+      ? "Kéo bát lên để xem kết quả."
+      : gameData.round.won
+        ? `Bạn thắng! Lãi ${Math.max(0, gameData.profit || 0).toLocaleString("vi-VN")} K`
+        : `Bạn thua. Mất ${bet.amount.toLocaleString("vi-VN")} K`);
+    setPlaying(false);
+    return true;
+  };
+
   const rollGame = async (choice?: "tai" | "xiu") => {
     if (!betAmount && betType === "custom") {
       setMessage("Nhập tiền cược");
@@ -289,8 +386,18 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     setGameResult(null);
     setHistoryBeforeRound(wagerMode === "tai-xiu" ? roundHistory : null);
     setResultRevealed(false);
+    setRevealingResult(false);
     setIsHistoryOpen(false);
     setMessage("");
+
+    const bet: PendingBet = {
+      amount,
+      betType,
+      wagerMode,
+      selectedNumber,
+      choice,
+    };
+    setPendingBet(bet);
 
     if (wagerMode === "tai-xiu") {
       for (let remaining = 5; remaining > 0; remaining--) {
@@ -298,63 +405,13 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
       setCountdown(0);
-    } else {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-
-    const gameResponse = await fetch("/api/games", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount,
-        betType,
-        wagerMode,
-        selectedNumber: wagerMode === "tai-xiu" ? null : selectedNumber,
-        playerChoice: choice ?? null,
-      }),
-    });
-    const gameData = (await gameResponse.json()) as {
-      wallet?: { balance: number; debt: number };
-      round?: RoundPoint;
-      profit?: number;
-      interestDebt?: number;
-      error?: string;
-    };
-    if (!gameResponse.ok || !gameData.wallet || !gameData.round) {
       setRolling(false);
-      setCountdown(0);
-      setPlaying(false);
-      setHistoryBeforeRound(null);
-      setMessage(gameData.error || "Không thể lưu kết quả ván chơi. Vui lòng thử lại.");
+      setMessage("Kéo bát ra khỏi vòng tròn để xem kết quả.");
       return;
     }
 
-    const dice = gameData.round.dice ?? [];
-    await onWalletUpdate(gameData.wallet.balance, gameData.wallet.debt);
-    setRoundHistory((current) => [...current, gameData.round!].slice(-30));
-    if (wagerMode !== "tai-xiu") setHistoryBeforeRound(null);
-    setTotalRounds((current) => current + 1);
-
-    setGameResult({
-      dice,
-      total: gameData.round.total || 0,
-      result: gameData.round.result,
-      playerChoice: gameData.round.playerChoice,
-      won: gameData.round.won,
-      triple: dice[0] === dice[1] && dice[1] === dice[2],
-      profit: gameData.profit || 0,
-      wagerLabel: wagerMode === "tai-xiu" ? choice === "tai" ? "Cửa Tài" : "Cửa Xỉu" : `${wagerMode} ${selectedNumber}`,
-      wagerMode,
-    });
-    setResultRevealed(wagerMode !== "tai-xiu");
-
-    setRolling(false);
-    setMessage(wagerMode === "tai-xiu"
-      ? "Kéo bát lên để xem kết quả."
-      : gameData.round.won
-        ? `Bạn thắng! Lãi ${Math.max(0, gameData.profit || 0).toLocaleString("vi-VN")} K`
-        : `Bạn thua. Mất ${amount.toLocaleString("vi-VN")} K`);
-    setPlaying(false);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await settleBet(bet);
   };
 
   const chartPoints = historyForPanel.map((round, index) => {
@@ -375,7 +432,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       : "M 0,50 C 20,12 30,88 50,50 S 80,12 100,50";
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1.65fr)_minmax(420px,1fr)]">
+    <div className="mx-auto w-full max-w-3xl">
       {/* Game Area */}
       <div>
         <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
@@ -502,7 +559,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   onChoose={(choice) => {
                     void rollGame(choice);
                   }}
-                  disabled={rolling || (!betAmount && betType === "custom")}
+                  disabled={playing || (!betAmount && betType === "custom")}
                   dice={[1, 3, 5]}
                 />
               ) : <button
@@ -510,7 +567,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 onClick={() => {
                   void rollGame();
                 }}
-                disabled={rolling || (!betAmount && betType === "custom")}
+                disabled={playing || (!betAmount && betType === "custom")}
                 className="w-full rounded-2xl border border-violet-400/40 bg-violet-500/10 px-6 py-4 font-bold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50"
               >
                 Đặt cược {wagerMode === "triple" ? "Bộ Ba" : wagerMode === "pair" ? "Cặp" : wagerMode === "total" ? "Tổng Điểm" : "Số Đơn Lẻ"}
@@ -522,6 +579,21 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
             <div className="space-y-3">
               <p className="text-center text-sm font-semibold uppercase tracking-widest text-amber-200">Đang lắc xúc xắc</p>
               <TaiXiuBoard disabled rolling countdown={countdown} dice={rollingDice} bowlCovered />
+            </div>
+          )}
+
+          {playing && !rolling && wagerMode === "tai-xiu" && pendingBet && (
+            <div className="space-y-3">
+              <p aria-live="polite" className="text-center text-sm font-semibold text-amber-200">
+                {revealingResult ? "Đang mở bát..." : "Kéo bát ra khỏi vòng tròn theo bất kỳ hướng nào."}
+              </p>
+              <TaiXiuBoard
+                disabled
+                dice={rollingDice}
+                bowlCovered
+                bowlInteractive={!revealingResult}
+                onReveal={() => settleBet(pendingBet)}
+              />
             </div>
           )}
 
@@ -541,15 +613,6 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   result={resultRevealed ? gameResult.result : null}
                   bowlCovered={!resultRevealed}
                   bowlInteractive={!resultRevealed}
-                  onReveal={() => {
-                    setResultRevealed(true);
-                    setHistoryBeforeRound(null);
-                    setMessage(
-                      gameResult.triple
-                        ? `Bộ ba đồng nhất: cả Tài và Xỉu đều thua. Tổng ${gameResult.total}.`
-                        : `Kết quả ${gameResult.result === "tai" ? "TÀI" : "XỈU"} (${gameResult.total}). ${gameResult.won ? "Bạn thắng!" : "Bạn thua."}`
-                    );
-                  }}
                 />
               ) : (
                 <div className="rounded-2xl border border-amber-500/50 bg-amber-500/20 p-6">
@@ -574,6 +637,8 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   setGameResult(null);
                   setResultRevealed(false);
                   setIsHistoryOpen(false);
+                  setPendingBet(null);
+                  setHistoryBeforeRound(null);
                   setBetAmount("");
                   setMessage("");
                 }}
