@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, type PointerEvent as ReactPointerEvent } f
 type GameResult = {
   dice: number[];
   total: number;
+  amount: number;
   result: "tai" | "xiu" | null;
   playerChoice: string | null;
   won: boolean;
@@ -353,6 +354,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       playerChoice: gameData.round.playerChoice,
       won: gameData.round.won,
       triple: dice[0] === dice[1] && dice[1] === dice[2],
+      amount: bet.amount,
       profit: gameData.profit || 0,
       wagerLabel: bet.wagerMode === "tai-xiu" ? bet.choice === "tai" ? "Cửa Tài" : "Cửa Xỉu" : `${bet.wagerMode} ${bet.selectedNumber}`,
       wagerMode: bet.wagerMode,
@@ -403,11 +405,6 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     setPendingBet(bet);
 
     if (wagerMode === "tai-xiu") {
-      for (let remaining = 5; remaining > 0; remaining--) {
-        setCountdown(remaining);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-      setCountdown(0);
       try {
         const response = await fetch("/api/games", {
           method: "POST",
@@ -424,10 +421,11 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
         const data = await response.json() as {
           id?: string;
           dice?: number[];
+          wallet?: { balance: number; debt: number };
           error?: string;
         };
         if (!response.ok || !data.id || !data.dice || data.dice.length !== 3 ||
-            data.dice.some((die) => !Number.isInteger(die) || die < 1 || die > 6)) {
+            data.dice.some((die) => !Number.isInteger(die) || die < 1 || die > 6) || !data.wallet) {
           setRolling(false);
           setPlaying(false);
           setPendingBet(null);
@@ -435,8 +433,14 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
           setMessage(data.error || "Không thể chuẩn bị kết quả ván chơi. Vui lòng thử lại.");
           return;
         }
-        setRollingDice(data.dice);
+        await onWalletUpdate(data.wallet.balance, data.wallet.debt);
         setPendingBet({ ...bet, pendingId: data.id });
+        for (let remaining = 5; remaining > 0; remaining--) {
+          setCountdown(remaining);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        setCountdown(0);
+        setRollingDice(data.dice);
         setRolling(false);
         setMessage("Kéo bát ra khỏi vòng tròn để xem kết quả.");
       } catch {
@@ -492,8 +496,20 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
           </div>
 
           <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-center">
-            <p className="text-xs uppercase text-red-300">Số nợ</p>
-            <p className="mt-1 text-xl font-bold text-white">{wallet.debt.toLocaleString("vi-VN")}</p>
+            <p className="text-xs uppercase text-red-300">
+              {gameResult
+                ? gameResult.won ? "Tiền cộng sau khi thắng" : "Tiền trừ sau khi thua"
+                : pendingBet?.pendingId
+                  ? "Tiền cược đã trừ"
+                  : pendingBet ? "Đang xử lý tiền cược" : "Tiền cược"}
+            </p>
+            <p className={`mt-1 text-xl font-bold ${gameResult?.won ? "text-emerald-200" : "text-white"}`}>
+              {gameResult
+                ? `${gameResult.won ? "+" : "-"}${(gameResult.won ? gameResult.profit : gameResult.amount).toLocaleString("vi-VN")} VND`
+                : pendingBet
+                  ? `${pendingBet.amount.toLocaleString("vi-VN")} VND`
+                  : "Chưa đặt cược"}
+            </p>
           </div>
 
           {!playing && !gameResult ? (
@@ -702,6 +718,11 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
             </p>
           )}
         </div>
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-6 py-4 text-center">
+        <p className="text-xs uppercase tracking-[0.18em] text-emerald-200">Số nợ</p>
+        <p className="mt-1 text-xl font-bold text-white">{wallet.debt.toLocaleString("vi-VN")} VND</p>
       </div>
 
       {isHistoryOpen && (

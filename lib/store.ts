@@ -629,7 +629,7 @@ export async function prepareGameRound(
   wagerMode: StoredGameRound["wagerMode"],
   selectedNumber: number | null,
   playerChoice: "tai" | "xiu" | null,
-): Promise<{ id: string; dice: number[] }> {
+): Promise<{ id: string; dice: number[]; wallet: { balance: number; debt: number } }> {
   await ensureDatabaseReady();
   await recoverPendingGameRounds(userId);
   const wallet = await getOrCreateWallet(userId);
@@ -679,13 +679,8 @@ export async function prepareGameRound(
 
   const profit = won ? Math.floor(expectedAmount * payoutMultiplier) : -expectedAmount;
   const interestDebt = wallet.debt > 0 ? Math.floor(wallet.debt * 0.2) : 0;
-  let balanceDelta = profit;
-  let debtDelta = interestDebt;
-  const nextBalance = wallet.balance + balanceDelta;
-  if (nextBalance < 0) {
-    debtDelta += Math.abs(nextBalance);
-    balanceDelta = -wallet.balance;
-  }
+  const balanceDelta = won ? expectedAmount + profit : 0;
+  const debtDelta = interestDebt;
 
   const round: StoredGameRound = {
     result,
@@ -697,19 +692,41 @@ export async function prepareGameRound(
     dice,
   };
   const id = crypto.randomUUID();
-  await sql`
-    INSERT INTO pending_game_rounds (
+  const prepared = await sql`
+    WITH reserved AS (
+      UPDATE user_wallets
+      SET balance = balance - ${expectedAmount},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ${userId}
+        AND balance = ${wallet.balance}
+        AND debt = ${wallet.debt}
+        AND balance >= ${expectedAmount}
+      RETURNING balance, debt
+    ),
+    inserted AS (
+      INSERT INTO pending_game_rounds (
       id, user_id, expected_balance, expected_debt, balance_delta, debt_delta,
       result, player_choice, won, wager_mode, selected_number, total,
-      dice_1, dice_2, dice_3, profit, interest_debt
+      dice_1, dice_2, dice_3, profit, interest_debt, stake_reserved
+      )
+      SELECT
+        ${id}, ${userId}, reserved.balance, reserved.debt, ${balanceDelta}, ${debtDelta},
+        ${round.result}, ${round.playerChoice}, ${round.won}, ${round.wagerMode}, ${round.selectedNumber},
+        ${round.total}, ${round.dice[0]}, ${round.dice[1]}, ${round.dice[2]}, ${profit}, ${interestDebt}, TRUE
+      FROM reserved
+      RETURNING id
     )
-    VALUES (
-      ${id}, ${userId}, ${wallet.balance}, ${wallet.debt}, ${balanceDelta}, ${debtDelta},
-      ${round.result}, ${round.playerChoice}, ${round.won}, ${round.wagerMode}, ${round.selectedNumber},
-      ${round.total}, ${round.dice[0]}, ${round.dice[1]}, ${round.dice[2]}, ${profit}, ${interestDebt}
-    )
+    SELECT reserved.balance, reserved.debt
+    FROM reserved
+    INNER JOIN inserted ON TRUE
   `;
-  return { id, dice: round.dice };
+  if (!prepared.rows.length) throw new Error("INVALID_BET_AMOUNT");
+  const reservedWallet = prepared.rows[0] as { balance: string | number; debt: string | number };
+  return {
+    id,
+    dice: round.dice,
+    wallet: { balance: Number(reservedWallet.balance), debt: Number(reservedWallet.debt) },
+  };
 }
 
 export async function settlePreparedGameRound(
@@ -728,9 +745,15 @@ export async function settlePreparedGameRound(
     ),
     updated AS (
       UPDATE user_wallets AS wallet
-      SET balance = GREATEST(wallet.balance + pending.profit, 0),
-          debt = wallet.debt + pending.interest_debt +
-            GREATEST(-(wallet.balance + pending.profit), 0),
+      SET balance = CASE
+            WHEN pending.stake_reserved THEN wallet.balance + pending.balance_delta
+            ELSE GREATEST(wallet.balance + pending.profit, 0)
+          END,
+          debt = CASE
+            WHEN pending.stake_reserved THEN wallet.debt + pending.debt_delta
+            ELSE wallet.debt + pending.interest_debt +
+              GREATEST(-(wallet.balance + pending.profit), 0)
+          END,
           updated_at = CURRENT_TIMESTAMP
       FROM pending
       WHERE wallet.user_id = pending.user_id

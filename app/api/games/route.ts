@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         selectedNumber ?? null,
         body.playerChoice as "tai" | "xiu" | null,
       );
-      return NextResponse.json({ ok: true, id: prepared.id, dice: prepared.dice });
+      return NextResponse.json({ ok: true, id: prepared.id, dice: prepared.dice, wallet: prepared.wallet });
     }
 
     const game = await resolveGameRound(userId, amount, body.betType as "custom" | "half" | "all", body.wagerMode as StoredGameRound["wagerMode"], selectedNumber ?? null, body.playerChoice as "tai" | "xiu" | null);

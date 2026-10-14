@@ -188,8 +188,14 @@ export async function initializeDatabase() {
         dice_3 INTEGER NOT NULL,
         profit BIGINT NOT NULL,
         interest_debt BIGINT NOT NULL,
+        stake_reserved BOOLEAN NOT NULL DEFAULT FALSE,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+    `;
+
+    await sql`
+      ALTER TABLE pending_game_rounds
+      ADD COLUMN IF NOT EXISTS stake_reserved BOOLEAN NOT NULL DEFAULT FALSE;
     `;
 
     console.log("✅ Database initialized successfully");
