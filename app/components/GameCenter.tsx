@@ -255,7 +255,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       const response = await fetch("/api/games", { cache: "no-store" });
       if (!cancelled && response.ok) {
         const data = (await response.json()) as { rounds: RoundPoint[]; totalRounds: number };
-        setRoundHistory(data.rounds.slice(-50));
+        setRoundHistory(data.rounds.slice(-40));
         setTotalRounds(data.totalRounds);
       }
     };
@@ -342,7 +342,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
     const dice = gameData.round.dice ?? [];
     await onWalletUpdate(gameData.wallet.balance, gameData.wallet.debt);
-    setRoundHistory((current) => [...current, gameData.round!].slice(-50));
+    setRoundHistory((current) => [...current, gameData.round!].slice(-40));
     setHistoryBeforeRound(null);
     setTotalRounds((current) => current + 1);
 
@@ -453,7 +453,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     await settleBet(bet);
   };
 
-  const visibleHistory = historyForPanel.slice(-50);
+  const visibleHistory = historyForPanel.slice(-40);
   const chartPoints = visibleHistory.map((round, index) => {
     const x = visibleHistory.length === 1 ? 50 : (index / (visibleHistory.length - 1)) * 100;
     const y = round.result === "tai" ? 22 : 78;

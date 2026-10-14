@@ -820,7 +820,7 @@ export async function recoverPendingGameRounds(
   return settledRounds;
 }
 
-export async function getRecentGameRounds(limit = 50): Promise<StoredGameRound[]> {
+export async function getRecentGameRounds(limit = 40): Promise<StoredGameRound[]> {
   await ensureDatabaseReady();
   const result = await sql`
     SELECT result, player_choice, won, wager_mode, selected_number, total, dice_1, dice_2, dice_3
