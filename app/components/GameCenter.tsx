@@ -453,8 +453,9 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     await settleBet(bet);
   };
 
-  const chartPoints = historyForPanel.map((round, index) => {
-    const x = historyForPanel.length === 1 ? 50 : (index / (historyForPanel.length - 1)) * 100;
+  const visibleHistory = historyForPanel.slice(-20);
+  const chartPoints = visibleHistory.map((round, index) => {
+    const x = visibleHistory.length === 1 ? 50 : (index / (visibleHistory.length - 1)) * 100;
     const y = round.result === "tai" ? 22 : 78;
     return `${x},${y}`;
   });
@@ -735,10 +736,10 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
               <span className="font-bold text-white">{totalRounds} ván</span>
             </div>
             <div className="relative flex aspect-[1.6] items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3 sm:aspect-[2.4]">
-              <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" role="img" aria-label="Biểu đồ kết quả các ván">
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full overflow-visible" role="img" aria-label="Biểu đồ kết quả các ván">
                 <path d="M 0,50 H 100" stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 3" />
                 <path d={chartPath} fill="none" stroke="#c4b5fd" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-                {chartPoints.slice(-20).map((point, index) => {
+                {chartPoints.map((point, index) => {
                   const [x, y] = point.split(",");
                   return <circle key={`${point}-${index}`} cx={x} cy={y} r="1.6" fill="#fbbf24" />;
                 })}
