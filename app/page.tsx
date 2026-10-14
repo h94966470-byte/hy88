@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { hasPasswordDiacritics } from "@/lib/password-validation";
 import GameCenter from "./components/GameCenter";
 
-const menuItems = ["Trang chủ", "Sòng bạc", "Ví", "Khuyến mãi", "Hỗ trợ"];
+const menuItems = ["Ví", "Khuyến mãi", "Hỗ trợ"];
 const supportLinks = [
   {
     label: "Website",
@@ -239,14 +239,14 @@ export default function HomePage() {
     return Promise.resolve(true);
   };
 
-  const claimBonus = async (action: "daily" | "newbie") => {
+  const claimBonus = async () => {
     if (!wallet) return;
     const todayKey = formatDateKey(new Date());
     setLoading(true);
     const res = await fetch("/api/wallet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, dateKey: todayKey }),
+      body: JSON.stringify({ action: "daily", dateKey: todayKey }),
     });
     const data = (await res.json()) as { wallet?: WalletState; error?: string };
     setLoading(false);
@@ -255,10 +255,10 @@ export default function HomePage() {
       return;
     }
     setWallet(data.wallet);
-    setMessage(action === "daily" ? "Bạn đã nhận 50.000 VND từ Daily." : "Bạn đã nhận Daily người mới.");
+    setMessage("Bạn đã nhận 50.000 VND từ Daily.");
   };
 
-  const handleDailyBonus = () => void claimBonus("daily");
+  const handleDailyBonus = () => void claimBonus();
 
   const handleBorrow = async () => {
     setLoading(true);
@@ -299,23 +299,6 @@ export default function HomePage() {
     setWallet(data.wallet);
     setRepaymentAmount("");
     setMessage(`Đã trả ${amount.toLocaleString("vi-VN")} VND tiền nợ.`);
-  };
-
-  const handleNewUserDaily = () => {
-    if (!wallet) return;
-    const todayKey = formatDateKey(new Date());
-
-    if (wallet.newbieStep >= 7) {
-      setMessage("Nút Daily người mới đã hết hiệu lực.");
-      return;
-    }
-
-    if (wallet.newbieDailyClaimDate === todayKey) {
-      setMessage("Bạn đã nhận Daily người mới hôm nay rồi.");
-      return;
-    }
-
-    void claimBonus("newbie");
   };
 
   const handleSignup = async () => {
@@ -404,59 +387,76 @@ export default function HomePage() {
     return (
       <DeviceAccessGate>
         <main className="min-h-screen bg-slate-950 text-white">
-        <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-4 px-6 py-4">
-            <div className="flex items-center gap-4">
-              <div className="text-xl font-bold text-amber-400">HY88</div>
-              <nav aria-label="Điều hướng chính" className="hidden items-center gap-6 text-sm text-slate-300 md:flex">
-                {menuItems.map((item, index) => (
-                  <button
-                    key={item}
-                    type="button"
-                    style={{ animationDelay: `${index * 60}ms` }}
-                    className={`auth-field auth-btn rounded-lg border px-3 py-2 transition ${activeMenu === item ? "auth-btn-active border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
-                    onClick={() => setActiveMenu(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </nav>
-            </div>
+        <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-900/95 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-3 px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              className="text-xl font-bold text-amber-400"
+              onClick={() => setActiveMenu("Trang chủ")}
+            >
+              HY88
+            </button>
 
-            <div className="flex items-center gap-3">
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-sm text-emerald-200">
-                {session.user?.name || "Người chơi"}
-              </span>
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setIsMobileMenuOpen((open) => !open)}
                 aria-label={isMobileMenuOpen ? "Đóng menu" : "Mở menu"}
                 aria-expanded={isMobileMenuOpen}
                 aria-controls="mobile-navigation"
-                className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-200 hover:bg-white/10 md:hidden"
+                className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-200 transition hover:bg-white/10"
               >
                 <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  {isMobileMenuOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                  )}
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMenu("Thông báo");
+                  setIsMobileMenuOpen(false);
+                }}
+                aria-label="Thông báo"
+                title="Thông báo"
+                className="rounded-xl border border-white/10 bg-white/5 p-2.5 text-slate-200 transition hover:bg-white/10"
+              >
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMenu("Sòng bạc");
+                  setIsMobileMenuOpen(false);
+                }}
+                aria-label="Sòng bạc"
+                title="Sòng bạc"
+                className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-2.5 text-amber-200 transition hover:bg-amber-500/20"
+              >
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <rect x="4" y="4" width="16" height="16" rx="3" />
+                  <circle cx="8.5" cy="8.5" r="1" fill="currentColor" />
+                  <circle cx="15.5" cy="8.5" r="1" fill="currentColor" />
+                  <circle cx="12" cy="12" r="1" fill="currentColor" />
+                  <circle cx="8.5" cy="15.5" r="1" fill="currentColor" />
+                  <circle cx="15.5" cy="15.5" r="1" fill="currentColor" />
                 </svg>
               </button>
               <button
                 type="button"
                 onClick={() => void handleLogout()}
                 disabled={loading}
-                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm transition hover:bg-white/10 sm:px-4"
               >
-                {loading ? "Đang đăng xuất..." : "Đăng xuất"}
+                {loading ? "Đang thoát..." : "Đăng xuất"}
               </button>
             </div>
 
             <nav
               id="mobile-navigation"
-              aria-label="Điều hướng điện thoại"
-              className={`${isMobileMenuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm text-slate-300 md:hidden`}
+              aria-label="Điều hướng chính"
+              className={`${isMobileMenuOpen ? "flex" : "hidden"} w-full flex-col gap-1 border-t border-white/10 pt-3 text-sm text-slate-300`}
             >
               {menuItems.map((item, index) => (
                 <button
@@ -481,27 +481,24 @@ export default function HomePage() {
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-slate-300">Đang tải số dư...</div>
           ) : activeMenu === "Sòng bạc" ? (
             <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
+          ) : activeMenu === "Thông báo" ? (
+            <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
+              <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Thông báo</p>
+              <h1 className="mt-3 text-3xl font-bold text-white">Chưa có thông báo</h1>
+            </div>
           ) : activeMenu === "Ví" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Ví tiền</p>
-                  <h1 className="mt-2 text-4xl font-bold text-white">{wallet ? `${wallet.balance.toLocaleString("vi-VN")} VND` : "0 VND"}</h1>
-                </div>
-                {wallet && wallet.debt > 0 && (
-                  <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-6 py-4">
-                    <p className="text-sm text-red-300">Nợ</p>
-                    <p className="mt-2 text-2xl font-bold text-red-200">{wallet.debt.toLocaleString("vi-VN")} VND</p>
-                  </div>
-                )}
+              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-6 py-5">
+                <p className="text-sm uppercase tracking-[0.18em] text-red-300">Số nợ</p>
+                <p className="mt-2 text-3xl font-bold text-red-100">{(wallet?.debt ?? 0).toLocaleString("vi-VN")} VND</p>
               </div>
 
-              <div className="mt-8 grid gap-5 md:grid-cols-2">
+              <div className="mt-6 grid gap-4 lg:grid-cols-3">
                 <button
                   type="button"
                   onClick={handleDailyBonus}
                   disabled={loading}
-                  className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-left transition hover:bg-amber-500/15"
+                  className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5 text-left transition hover:bg-amber-500/15 disabled:opacity-50"
                 >
                   <p className="text-sm text-amber-200">Daily</p>
                   <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
@@ -540,20 +537,6 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleNewUserDaily}
-                  disabled={(wallet?.newbieStep ?? 0) >= 7}
-                  className="rounded-2xl border border-violet-400/40 bg-violet-500/10 p-5 text-left transition hover:bg-violet-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <p className="text-sm text-violet-200">Daily người mới</p>
-                  <p className="mt-2 text-2xl font-bold text-white">
-                    {(wallet?.newbieStep ?? 0) >= 7 ? "Hoàn thành" : `+${[300000, 200000, 100000, 100000, 100000, 100000, 100000][wallet?.newbieStep ?? 0].toLocaleString("vi-VN")} VND`}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-300">
-                    {wallet && (wallet.newbieStep ?? 0) >= 7 ? "Bạn đã hoàn tất 7 ngày." : "Ngày 1: 300k • Ngày 2: 200k • Từ ngày 3 đến 7: 100k"}
-                  </p>
-                </button>
               </div>
 
               {message && <p className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">{message}</p>}

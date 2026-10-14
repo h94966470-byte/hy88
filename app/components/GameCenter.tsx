@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 
 type GameResult = {
   dice: number[];
@@ -59,6 +59,64 @@ function Die({ value, rolling = false }: { value: number; rolling?: boolean }) {
   );
 }
 
+function BowlCover({ onReveal, disabled = false }: { onReveal?: () => void; disabled?: boolean }) {
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const pointerStart = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (disabled || !onReveal) return;
+    event.preventDefault();
+    pointerStart.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging(true);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (disabled || !onReveal) return;
+    const start = pointerStart.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+
+    const x = event.clientX - start.x;
+    const y = event.clientY - start.y;
+    setOffset({ x, y });
+
+    if (y <= -130) {
+      pointerStart.current = null;
+      setDragging(false);
+      onReveal();
+    }
+  };
+
+  const handlePointerEnd = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (pointerStart.current?.pointerId !== event.pointerId) return;
+    pointerStart.current = null;
+    setDragging(false);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label="Giữ và kéo bát lên để mở kết quả"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      disabled={disabled}
+      className={`absolute inset-[5%] z-10 flex touch-none select-none flex-col items-center justify-center rounded-full border-4 border-amber-100/70 text-amber-50 shadow-[inset_0_8px_18px_rgba(255,255,255,0.55),inset_0_-18px_22px_rgba(0,0,0,0.65),0_12px_22px_rgba(0,0,0,0.65)] disabled:cursor-default disabled:opacity-100 ${dragging ? "cursor-grabbing duration-0" : "cursor-grab transition-transform duration-300 ease-out"}`}
+      style={{
+        transform: `translate3d(${offset.x}px, ${offset.y}px, 0)`,
+        backgroundImage: "radial-gradient(ellipse at 35% 25%, #fff0b8 0%, #c8a66d 24%, #766044 58%, #32271e 100%)",
+      }}
+    >
+      <span className="rounded-full border border-amber-50/60 bg-black/35 px-3 py-1 text-[9px] font-black tracking-[0.18em] sm:text-xs">
+        GIỮ &amp; KÉO LÊN
+      </span>
+    </button>
+  );
+}
+
 function TaiXiuBoard({
   onChoose,
   disabled,
@@ -66,6 +124,9 @@ function TaiXiuBoard({
   countdown,
   dice,
   result,
+  bowlCovered,
+  bowlInteractive,
+  onReveal,
 }: {
   onChoose?: (choice: "tai" | "xiu") => void;
   disabled?: boolean;
@@ -73,6 +134,9 @@ function TaiXiuBoard({
   countdown?: number;
   dice: number[];
   result?: "tai" | "xiu" | null;
+  bowlCovered?: boolean;
+  bowlInteractive?: boolean;
+  onReveal?: () => void;
 }) {
   return (
     <div className="rounded-2xl border border-amber-300/40 bg-amber-950/30 p-3 shadow-inner shadow-black/20 sm:p-5">
@@ -91,26 +155,25 @@ function TaiXiuBoard({
           </span>
         </button>
 
-        <div className="flex aspect-square flex-col items-center justify-center rounded-full border-2 border-amber-300/70 bg-slate-950/90 p-1 shadow-[0_0_24px_rgba(251,191,36,0.2)] sm:p-3">
-          {rolling ? (
-            <>
-              <div className="flex items-center justify-center gap-1">
-                {dice.map((value, index) => <Die key={index} value={value} rolling />)}
-              </div>
-              <span aria-live="polite" className="mt-1 text-2xl font-black tabular-nums text-amber-200 sm:text-3xl">
-                {String(countdown ?? 0).padStart(2, "0")}
+        <div className="relative flex aspect-square min-w-[6.5rem] flex-col items-center justify-center rounded-full border-2 border-amber-300/70 bg-slate-950/90 p-1 shadow-[0_0_24px_rgba(251,191,36,0.2)] sm:p-3">
+          <div className="grid grid-cols-2 grid-rows-2 items-center justify-items-center gap-0.5">
+            {dice.slice(0, 3).map((value, index) => (
+              <span key={index} className={index === 0 ? "col-span-2" : ""}>
+                <Die value={value} rolling={rolling} />
               </span>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-center gap-1">
-                {dice.map((value, index) => <Die key={index} value={value} />)}
-              </div>
-              <span className="mt-1 text-[9px] font-bold uppercase tracking-wider text-amber-200 sm:text-[10px]">
-                {result ? `Tổng ${dice.reduce((sum, die) => sum + die, 0)}` : "Sẵn sàng"}
-              </span>
-            </>
+            ))}
+          </div>
+          {rolling && (
+            <span aria-live="polite" className="mt-1 text-lg font-black tabular-nums text-amber-200 sm:text-2xl">
+              {String(countdown ?? 0).padStart(2, "0")}
+            </span>
           )}
+          {!rolling && !bowlCovered && (
+            <span className="mt-1 text-[9px] font-bold uppercase tracking-wider text-amber-200 sm:text-[10px]">
+              {result ? `Tổng ${dice.reduce((sum, die) => sum + die, 0)}` : "Sẵn sàng"}
+            </span>
+          )}
+          {bowlCovered && <BowlCover onReveal={onReveal} disabled={!bowlInteractive} />}
         </div>
 
         <button
@@ -146,13 +209,15 @@ interface GameCenterProps {
 export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) {
   const [betAmount, setBetAmount] = useState("");
   const [betType, setBetType] = useState<"custom" | "half" | "all">("custom");
-    const [wagerMode, setWagerMode] = useState<WagerMode>("tai-xiu");
-    const [selectedNumber, setSelectedNumber] = useState(1);
+  const [wagerMode, setWagerMode] = useState<WagerMode>("tai-xiu");
+  const [selectedNumber, setSelectedNumber] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [rollingDice, setRollingDice] = useState([2, 4, 6]);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
+  const [resultRevealed, setResultRevealed] = useState(false);
+  const [isResultPopupOpen, setIsResultPopupOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [roundHistory, setRoundHistory] = useState<RoundPoint[]>([]);
   const [totalRounds, setTotalRounds] = useState(0);
@@ -190,6 +255,15 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     return () => window.clearInterval(interval);
   }, [rolling, wagerMode]);
 
+  useEffect(() => {
+    if (!isResultPopupOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsResultPopupOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isResultPopupOpen]);
+
   if (!wallet) return null;
 
   const actualBalance = wallet.balance;
@@ -210,6 +284,9 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
     setPlaying(true);
     setRolling(true);
+    setGameResult(null);
+    setResultRevealed(false);
+    setIsResultPopupOpen(false);
     setMessage("");
 
     if (wagerMode === "tai-xiu") {
@@ -264,15 +341,14 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       wagerLabel: wagerMode === "tai-xiu" ? choice === "tai" ? "Cửa Tài" : "Cửa Xỉu" : `${wagerMode} ${selectedNumber}`,
       wagerMode,
     });
+    setResultRevealed(wagerMode !== "tai-xiu");
 
     setRolling(false);
-    setMessage(
-      dice[0] === dice[1] && dice[1] === dice[2] && wagerMode === "tai-xiu"
-        ? `Bộ ba đồng nhất: cả Tài và Xỉu đều thua. Bạn mất ${amount.toLocaleString("vi-VN")} K`
-        : gameData.round.won
-          ? `Bạn thắng! Lãi ${Math.max(0, gameData.profit || 0).toLocaleString("vi-VN")} K`
-          : `Bạn thua. Mất ${amount.toLocaleString("vi-VN")} K`
-    );
+    setMessage(wagerMode === "tai-xiu"
+      ? "Kéo bát lên để xem kết quả."
+      : gameData.round.won
+        ? `Bạn thắng! Lãi ${Math.max(0, gameData.profit || 0).toLocaleString("vi-VN")} K`
+        : `Bạn thua. Mất ${amount.toLocaleString("vi-VN")} K`);
     setPlaying(false);
   };
 
@@ -298,26 +374,25 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       {/* Game Area */}
       <div>
         <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
-          <div className="mb-8">
-            <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Tài Xỉu</p>
-            <h1 className="mt-2 text-3xl font-bold text-white">Tài Xỉu</h1>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Tài Xỉu</p>
+              <h1 className="mt-2 text-3xl font-bold text-white">Tài Xỉu</h1>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsResultPopupOpen(true)}
+              disabled={!gameResult || (gameResult.wagerMode === "tai-xiu" && !resultRevealed)}
+              aria-label="Mở kết quả cầu"
+              className="rounded-xl border border-amber-400/50 bg-amber-500/10 px-4 py-2 text-sm font-bold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Cầu
+            </button>
           </div>
 
-          <div className="mb-8 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-xs text-emerald-300 uppercase">Số dư</p>
-                <p className="mt-1 text-2xl font-bold text-white">{actualBalance.toLocaleString("vi-VN")}</p>
-              </div>
-              <div>
-                <p className="text-xs text-red-300 uppercase">Nợ</p>
-                <p className="mt-1 text-2xl font-bold text-white">{wallet.debt.toLocaleString("vi-VN")}</p>
-              </div>
-              <div>
-                <p className="text-xs text-blue-300 uppercase">Ván</p>
-                <p className="mt-1 text-2xl font-bold text-white">{totalRounds}</p>
-              </div>
-            </div>
+          <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-center">
+            <p className="text-xs uppercase text-red-300">Số nợ</p>
+            <p className="mt-1 text-xl font-bold text-white">{wallet.debt.toLocaleString("vi-VN")}</p>
           </div>
 
           {!playing && !gameResult ? (
@@ -353,7 +428,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                     betType === "half" ? "auth-btn-active border-blue-400/60 bg-blue-500/20 text-blue-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
-                  Nửa ({Math.floor(actualBalance / 2)}K) x{MULTIPLIER_HALF}
+                  Nửa số dư x{MULTIPLIER_HALF}
                 </button>
                 <button
                   type="button"
@@ -363,7 +438,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                     betType === "all" ? "auth-btn-active border-red-400/60 bg-red-500/20 text-red-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
-                  Tất cả ({actualBalance}K) x{MULTIPLIER_ALL}
+                  Tất cả số dư x{MULTIPLIER_ALL}
                 </button>
               </div>
 
@@ -439,66 +514,72 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
             </div>
           ) : null}
 
-          {playing && rolling && (
-                wagerMode === "tai-xiu" ? (
-                  <div className="space-y-3">
-                    <p className="text-center text-sm font-semibold uppercase tracking-widest text-amber-200">Đang lắc xúc xắc</p>
-                    <TaiXiuBoard disabled rolling countdown={countdown} dice={rollingDice} />
-                  </div>
-                ) : (
-                  <div className="text-center space-y-6">
-                    <p className="text-sm text-slate-300">Đang gieo xúc xắc...</p>
-                    <div className="text-6xl animate-spin">*</div>
-                  </div>
-                )
+          {playing && rolling && wagerMode === "tai-xiu" && (
+            <div className="space-y-3">
+              <p className="text-center text-sm font-semibold uppercase tracking-widest text-amber-200">Đang lắc xúc xắc</p>
+              <TaiXiuBoard disabled rolling countdown={countdown} dice={rollingDice} bowlCovered />
+            </div>
+          )}
+
+          {playing && rolling && wagerMode !== "tai-xiu" && (
+            <div className="space-y-3 text-center">
+              <p className="text-sm text-slate-300">Đang gieo xúc xắc...</p>
+              <div className="text-6xl animate-spin">*</div>
+            </div>
+          )}
+
+          {gameResult && (
+            <div className="space-y-5 text-center">
+              {gameResult.wagerMode === "tai-xiu" ? (
+                <TaiXiuBoard
+                  disabled
+                  dice={gameResult.dice}
+                  result={resultRevealed ? gameResult.result : null}
+                  bowlCovered={!resultRevealed}
+                  bowlInteractive={!resultRevealed}
+                  onReveal={() => {
+                    setResultRevealed(true);
+                    setMessage(
+                      gameResult.triple
+                        ? `Bộ ba đồng nhất: cả Tài và Xỉu đều thua. Tổng ${gameResult.total}.`
+                        : `Kết quả ${gameResult.result === "tai" ? "TÀI" : "XỈU"} (${gameResult.total}). ${gameResult.won ? "Bạn thắng!" : "Bạn thua."}`
+                    );
+                  }}
+                />
+              ) : (
+                <div className="rounded-2xl border border-amber-500/50 bg-amber-500/20 p-6">
+                  <p className="text-2xl font-bold">
+                    {gameResult.dice[0]} + {gameResult.dice[1]} + {gameResult.dice[2]} = {gameResult.total}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-300">
+                    Kết quả: {gameResult.result === "tai" ? "TÀI" : "XỈU"}
+                  </p>
+                </div>
               )}
 
-              {gameResult && (
-                <div className="text-center space-y-6">
-                  {gameResult.wagerMode === "tai-xiu" ? (
-                    <TaiXiuBoard disabled dice={gameResult.dice} result={gameResult.result} />
-                  ) : (
-                    <div className="rounded-2xl border border-amber-500/50 bg-amber-500/20 p-6">
-                      <p className="text-3xl font-bold">
-                        {gameResult.dice[0]} + {gameResult.dice[1]} + {gameResult.dice[2]} = {gameResult.total}
-                      </p>
-                      <p className="mt-2 text-sm text-slate-300">
-                        Kết quả: {gameResult.result === "tai" ? "TÀI" : "XỈU"}
-                      </p>
-                      <p className="mt-1 text-sm text-amber-200">Cược: {gameResult.wagerLabel}</p>
-                    </div>
-                  )}
-                  {gameResult.wagerMode === "tai-xiu" && (
-                    <p className="text-sm text-slate-300">
-                      {gameResult.dice.join(" + ")} = {gameResult.total} · Cược: {gameResult.wagerLabel}
-                    </p>
-                  )}
-
-              <div
-                className={`rounded-2xl border p-6 ${gameResult.won ? "border-emerald-500/50 bg-emerald-500/20" : "border-red-500/50 bg-red-500/20"}`}
-              >
-                <p className={`text-lg font-bold ${gameResult.won ? "text-emerald-200" : "text-red-200"}`}>
-                  {gameResult.triple && gameResult.wagerMode === "tai-xiu" ? "BỘ BA ĐỒNG NHẤT - THUA" : gameResult.won ? "THẮNG" : "THUA"}
+              {gameResult.wagerMode === "tai-xiu" && (
+                <p aria-live="polite" className="text-sm text-amber-200">
+                  {resultRevealed ? message : "Nhấn giữ và kéo bát lên để mở kết quả."}
                 </p>
-                <p className={`text-3xl font-bold mt-2 ${gameResult.won ? "text-emerald-300" : "text-red-300"}`}>
-                  {gameResult.won ? "+" : "-"}{Math.abs(gameResult.profit).toLocaleString("vi-VN")} K
-                </p>
-              </div>
+              )}
 
               <button
+                type="button"
                 onClick={() => {
                   setGameResult(null);
+                  setResultRevealed(false);
+                  setIsResultPopupOpen(false);
                   setBetAmount("");
                   setMessage("");
                 }}
                 className="w-full rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 font-semibold text-amber-200 transition hover:bg-amber-500/20"
               >
-                  Chơi lại
+                Chơi lại
               </button>
             </div>
           )}
 
-          {message && (
+          {message && !gameResult && (
             <p className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-200">
               {message}
             </p>
@@ -538,6 +619,53 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
           </p>
         </div>
       </div>
+      {isResultPopupOpen && gameResult && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+          onClick={() => setIsResultPopupOpen(false)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="game-result-title"
+            className="w-full max-w-lg space-y-5 rounded-3xl border border-amber-300/40 bg-slate-900 p-6 shadow-2xl sm:p-8"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm uppercase tracking-[0.2em] text-amber-300">Cầu</p>
+                <h2 id="game-result-title" className="mt-2 text-2xl font-bold text-white">Kết quả ván chơi</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResultPopupOpen(false)}
+                aria-label="Đóng kết quả"
+                className="rounded-lg border border-white/10 px-3 py-1 text-slate-300 hover:bg-white/10"
+              >
+                ×
+              </button>
+            </div>
+
+            {gameResult.wagerMode === "tai-xiu" && (
+              <TaiXiuBoard disabled dice={gameResult.dice} result={gameResult.result} />
+            )}
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-center">
+              <p className="text-2xl font-bold text-white">
+                {gameResult.dice.join(" + ")} = {gameResult.total}
+              </p>
+              <p className="mt-2 text-amber-200">
+                {gameResult.triple && gameResult.wagerMode === "tai-xiu"
+                  ? "Bộ ba đồng nhất - cả Tài và Xỉu đều thua"
+                  : `Kết quả: ${gameResult.result === "tai" ? "TÀI" : "XỈU"}`}
+              </p>
+              <p className="mt-1 text-sm text-slate-300">Cược: {gameResult.wagerLabel}</p>
+              <p className={`mt-3 text-xl font-bold ${gameResult.won ? "text-emerald-300" : "text-red-300"}`}>
+                {gameResult.won ? "THẮNG +" : "THUA -"}{Math.abs(gameResult.profit).toLocaleString("vi-VN")} K
+              </p>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
