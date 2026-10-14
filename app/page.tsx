@@ -701,7 +701,7 @@ export default function HomePage() {
 
   return (
     <DeviceAccessGate>
-      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#1e293b,_#020617_60%)] px-4">
+      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#392719,_#09070a_60%)] px-4">
         <div className="auth-shell w-full max-w-md">
         <div className="auth-card rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl">
           <div className="relative mb-6 rounded-full bg-slate-800 p-1 ring-1 ring-white/10">

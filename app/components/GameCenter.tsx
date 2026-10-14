@@ -46,7 +46,8 @@ function Die({ value, rolling = false }: { value: number; rolling?: boolean }) {
     <span
       role="img"
       aria-label={`Xúc xắc ${value}`}
-      className={`grid h-8 w-8 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-red-200/40 bg-gradient-to-br from-red-400 to-red-700 p-1 shadow-lg shadow-black/40 sm:h-14 sm:w-14 sm:gap-1 sm:rounded-xl sm:p-2 ${rolling ? "animate-bounce" : ""}`}
+      className={`grid h-8 w-8 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-red-200/40 p-1 shadow-lg shadow-black/40 sm:h-14 sm:w-14 sm:gap-1 sm:rounded-xl sm:p-2 ${rolling ? "animate-bounce" : ""}`}
+      style={{ backgroundImage: "linear-gradient(135deg, #ff5364 0%, #db1732 55%, #8b071d 100%)" }}
     >
       {Array.from({ length: 9 }, (_, index) => (
         <span
