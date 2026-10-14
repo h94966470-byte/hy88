@@ -175,6 +175,33 @@ export default function HomePage() {
   const isAuthenticated = status === "authenticated" && !!session?.user;
 
   useEffect(() => {
+    const mobileUserAgent = /Android|iPhone|iPod|IEMobile|BlackBerry|Opera Mini|Mobile/i.test(navigator.userAgent);
+    const smallTouchScreen = navigator.maxTouchPoints > 1 &&
+      Math.min(window.screen.width, window.screen.height) <= 600;
+    if (!mobileUserAgent && !smallTouchScreen) return;
+
+    let requestPending = false;
+    const requestFullscreenOnTouch = () => {
+      const root = document.documentElement;
+      if (document.fullscreenElement) {
+        window.removeEventListener("pointerdown", requestFullscreenOnTouch, true);
+        return;
+      }
+      if (requestPending || !root.requestFullscreen) return;
+
+      requestPending = true;
+      void root.requestFullscreen()
+        .then(() => window.removeEventListener("pointerdown", requestFullscreenOnTouch, true))
+        .catch(() => {
+          requestPending = false;
+        });
+    };
+
+    window.addEventListener("pointerdown", requestFullscreenOnTouch, true);
+    return () => window.removeEventListener("pointerdown", requestFullscreenOnTouch, true);
+  }, []);
+
+  useEffect(() => {
     if (!isAuthenticated) {
       return;
     }
