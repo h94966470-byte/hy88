@@ -145,6 +145,21 @@
   transition: transform 0.6s ease;
 }
 
+.auth-btn-active {
+  background-image: radial-gradient(ellipse 30px 24px at 0% 50%, rgba(255, 210, 74, 0.5), transparent 100%);
+  background-size: 200% 100%;
+  animation: authGoldSweep 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes authGoldSweep {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 100% 50%;
+  }
+}
+
 .auth-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 12px 24px rgba(251, 191, 36, 0.2);
@@ -185,6 +200,7 @@ body {
   .auth-field,
   .auth-message,
   .auth-btn,
+  .auth-btn-active,
   .auth-mode-indicator {
     animation: none !important;
     transition: none !important;

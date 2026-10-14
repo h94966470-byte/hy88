@@ -414,7 +414,7 @@ export default function HomePage() {
                     key={item}
                     type="button"
                     style={{ animationDelay: `${index * 60}ms` }}
-                    className={`auth-field auth-btn rounded-lg border px-3 py-2 transition ${activeMenu === item ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
+                    className={`auth-field auth-btn rounded-lg border px-3 py-2 transition ${activeMenu === item ? "auth-btn-active border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
                     onClick={() => setActiveMenu(item)}
                   >
                     {item}
@@ -463,7 +463,7 @@ export default function HomePage() {
                   key={item}
                   type="button"
                   style={{ animationDelay: `${index * 60}ms` }}
-                  className={`auth-field auth-btn rounded-lg border px-3 py-2 text-left transition ${activeMenu === item ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
+                  className={`auth-field auth-btn rounded-lg border px-3 py-2 text-left transition ${activeMenu === item ? "auth-btn-active border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
                   onClick={() => {
                     setActiveMenu(item);
                     setIsMobileMenuOpen(false);

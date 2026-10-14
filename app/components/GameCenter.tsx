@@ -340,7 +340,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   onClick={() => setBetType("custom")}
                   style={{ animationDelay: "0ms" }}
                   className={`auth-field auth-btn rounded-xl border px-4 py-2 font-bold transition text-sm ${
-                    betType === "custom" ? "border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
+                    betType === "custom" ? "auth-btn-active border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
                   Tùy chỉnh ({betAmount || "0"}K)
@@ -350,7 +350,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   onClick={() => setBetType("half")}
                   style={{ animationDelay: "60ms" }}
                   className={`auth-field auth-btn rounded-xl border px-4 py-2 font-bold transition text-sm ${
-                    betType === "half" ? "border-blue-400/60 bg-blue-500/20 text-blue-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
+                    betType === "half" ? "auth-btn-active border-blue-400/60 bg-blue-500/20 text-blue-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
                   Nửa ({Math.floor(actualBalance / 2)}K) x{MULTIPLIER_HALF}
@@ -360,7 +360,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   onClick={() => setBetType("all")}
                   style={{ animationDelay: "120ms" }}
                   className={`auth-field auth-btn rounded-xl border px-4 py-2 font-bold transition text-sm ${
-                    betType === "all" ? "border-red-400/60 bg-red-500/20 text-red-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
+                    betType === "all" ? "auth-btn-active border-red-400/60 bg-red-500/20 text-red-200" : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                   }`}
                 >
                   Tất cả ({actualBalance}K) x{MULTIPLIER_ALL}
@@ -386,7 +386,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                     }}
                     className={`auth-field auth-btn rounded-xl border px-3 py-2 text-sm font-bold transition ${
                       wagerMode === mode
-                        ? "border-amber-400/60 bg-amber-500/20 text-amber-200"
+                        ? "auth-btn-active border-amber-400/60 bg-amber-500/20 text-amber-200"
                         : "border-slate-500/40 bg-slate-800/50 text-slate-300"
                     }`}
                   >
