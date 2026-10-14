@@ -741,7 +741,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 <path d={chartPath} fill="none" stroke="#c4b5fd" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
                 {chartPoints.map((point, index) => {
                   const [x, y] = point.split(",");
-                  return <circle key={`${point}-${index}`} cx={x} cy={y} r="1.6" fill="#fbbf24" />;
+                  return <circle key={`${point}-${index}`} cx={x} cy={y} r="0.9" fill="#fbbf24" />;
                 })}
               </svg>
             </div>
