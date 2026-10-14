@@ -82,7 +82,7 @@ const getDeviceAccounts = (): string[] => {
 
 function SimulationDisclaimer() {
   return (
-    <footer className="fixed bottom-3 right-3 z-40 w-[min(26rem,calc(100vw-1.5rem))] rounded-xl border border-amber-400/20 bg-slate-950/90 px-4 py-3 text-right text-[11px] leading-relaxed text-slate-400 shadow-lg backdrop-blur-md">
+    <footer className="fixed bottom-3 right-3 z-40 w-[min(26rem,calc(100vw-1.5rem))] rounded-xl border border-amber-400/20 bg-slate-950/90 px-4 py-3 text-right text-[11px] leading-relaxed text-slate-400 shadow-lg backdrop-blur-md max-md:bottom-2 max-md:right-2 max-md:w-[min(18rem,calc(100vw-1rem))] max-md:px-3 max-md:py-2 max-md:text-[10px]">
       <p>Mọi thứ trên web này đều là giả lập, không quy đổi ra tiền mặt, không cổ xúy chơi cờ bạc, đỏ đen.</p>
       <p className="mt-1 font-semibold text-amber-300">Hãy tránh xa cờ bạc.</p>
     </footer>
@@ -155,6 +155,7 @@ export default function HomePage() {
   const { data: session, status } = useSession();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [activeMenu, setActiveMenu] = useState<string>("Trang chủ");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -404,10 +405,10 @@ export default function HomePage() {
       <DeviceAccessGate>
         <main className="min-h-screen bg-slate-950 text-white">
         <header className="border-b border-white/10 bg-slate-900/80 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-y-4 px-6 py-4">
             <div className="flex items-center gap-4">
               <div className="text-xl font-bold text-amber-400">HY88</div>
-              <nav className="hidden items-center gap-6 text-sm text-slate-300 md:flex">
+              <nav aria-label="Điều hướng chính" className="hidden items-center gap-6 text-sm text-slate-300 md:flex">
                 {menuItems.map((item) => (
                   <button
                     key={item}
@@ -427,6 +428,22 @@ export default function HomePage() {
               </span>
               <button
                 type="button"
+                onClick={() => setIsMobileMenuOpen((open) => !open)}
+                aria-label={isMobileMenuOpen ? "Đóng menu" : "Mở menu"}
+                aria-expanded={isMobileMenuOpen}
+                aria-controls="mobile-navigation"
+                className="rounded-full border border-white/10 bg-white/5 p-2 text-slate-200 hover:bg-white/10 md:hidden"
+              >
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  {isMobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+              <button
+                type="button"
                 onClick={() => void handleLogout()}
                 disabled={loading}
                 className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
@@ -434,6 +451,26 @@ export default function HomePage() {
                 {loading ? "Đang đăng xuất..." : "Đăng xuất"}
               </button>
             </div>
+
+            <nav
+              id="mobile-navigation"
+              aria-label="Điều hướng điện thoại"
+              className={`${isMobileMenuOpen ? "flex" : "hidden"} w-full flex-col gap-1 text-sm text-slate-300 md:hidden`}
+            >
+              {menuItems.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={`rounded-lg px-3 py-2 text-left transition ${activeMenu === item ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white"}`}
+                  onClick={() => {
+                    setActiveMenu(item);
+                    setIsMobileMenuOpen(false);
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+            </nav>
           </div>
         </header>
 
