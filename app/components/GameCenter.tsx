@@ -33,6 +33,104 @@ type RoundPoint = {
   dice?: number[];
 };
 
+const diePips: Record<number, number[]> = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8],
+};
+
+function Die({ value, rolling = false }: { value: number; rolling?: boolean }) {
+  return (
+    <span
+      role="img"
+      aria-label={`Xúc xắc ${value}`}
+      className={`grid h-8 w-8 grid-cols-3 grid-rows-3 gap-0.5 rounded-lg border border-red-200/40 bg-gradient-to-br from-red-400 to-red-700 p-1 shadow-lg shadow-black/40 sm:h-14 sm:w-14 sm:gap-1 sm:rounded-xl sm:p-2 ${rolling ? "animate-bounce" : ""}`}
+    >
+      {Array.from({ length: 9 }, (_, index) => (
+        <span
+          key={index}
+          className={`rounded-full ${diePips[value]?.includes(index) ? "bg-white shadow-sm" : ""}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function TaiXiuBoard({
+  onChoose,
+  disabled,
+  rolling,
+  countdown,
+  dice,
+  result,
+}: {
+  onChoose?: (choice: "tai" | "xiu") => void;
+  disabled?: boolean;
+  rolling?: boolean;
+  countdown?: number;
+  dice: number[];
+  result?: "tai" | "xiu" | null;
+}) {
+  return (
+    <div className="rounded-2xl border border-amber-300/40 bg-amber-950/30 p-3 shadow-inner shadow-black/20 sm:p-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(6.5rem,1.2fr)_minmax(0,1fr)] items-center gap-2 sm:gap-4">
+        <button
+          type="button"
+          onClick={() => onChoose?.("tai")}
+          disabled={disabled || !onChoose}
+          aria-pressed={result === "tai"}
+          className={`flex min-h-24 flex-col items-center justify-center rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-300 via-amber-500 to-amber-800 px-2 py-4 text-slate-950 shadow-lg shadow-black/30 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-80 sm:min-h-32 sm:px-4 ${result === "tai" ? "ring-2 ring-white ring-offset-2 ring-offset-amber-950" : ""}`}
+        >
+          <span className="text-xl font-black tracking-wider sm:text-3xl">TÀI</span>
+          <span className="mt-1 text-xs font-semibold sm:text-sm">&gt; 10</span>
+          <span className="mt-2 text-[10px] font-bold uppercase tracking-widest sm:text-xs">
+            {rolling ? "Đang lắc" : result === "tai" ? "Kết quả" : "Đặt cược"}
+          </span>
+        </button>
+
+        <div className="flex aspect-square flex-col items-center justify-center rounded-full border-2 border-amber-300/70 bg-slate-950/90 p-1 shadow-[0_0_24px_rgba(251,191,36,0.2)] sm:p-3">
+          {rolling ? (
+            <>
+              <div className="flex items-center justify-center gap-1">
+                {dice.map((value, index) => <Die key={index} value={value} rolling />)}
+              </div>
+              <span aria-live="polite" className="mt-1 text-2xl font-black tabular-nums text-amber-200 sm:text-3xl">
+                {String(countdown ?? 0).padStart(2, "0")}
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-center gap-1">
+                {dice.map((value, index) => <Die key={index} value={value} />)}
+              </div>
+              <span className="mt-1 text-[9px] font-bold uppercase tracking-wider text-amber-200 sm:text-[10px]">
+                {result ? `Tổng ${dice.reduce((sum, die) => sum + die, 0)}` : "Sẵn sàng"}
+              </span>
+            </>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onChoose?.("xiu")}
+          disabled={disabled || !onChoose}
+          aria-pressed={result === "xiu"}
+          className={`flex min-h-24 flex-col items-center justify-center rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-300 via-amber-500 to-amber-800 px-2 py-4 text-slate-950 shadow-lg shadow-black/30 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-80 sm:min-h-32 sm:px-4 ${result === "xiu" ? "ring-2 ring-white ring-offset-2 ring-offset-amber-950" : ""}`}
+        >
+          <span className="text-xl font-black tracking-wider sm:text-3xl">XỈU</span>
+          <span className="mt-1 text-xs font-semibold sm:text-sm">&le; 10</span>
+          <span className="mt-2 text-[10px] font-bold uppercase tracking-widest sm:text-xs">
+            {rolling ? "Đang lắc" : result === "xiu" ? "Kết quả" : "Đặt cược"}
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface GameCenterProps {
   wallet: {
     balance: number;
@@ -52,6 +150,8 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     const [selectedNumber, setSelectedNumber] = useState(1);
   const [playing, setPlaying] = useState(false);
   const [rolling, setRolling] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [rollingDice, setRollingDice] = useState([2, 4, 6]);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [message, setMessage] = useState("");
   const [roundHistory, setRoundHistory] = useState<RoundPoint[]>([]);
@@ -78,6 +178,18 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     };
   }, []);
 
+  useEffect(() => {
+    if (!rolling || wagerMode !== "tai-xiu") return;
+    const interval = window.setInterval(() => {
+      setRollingDice([
+        Math.floor(Math.random() * 6) + 1,
+        Math.floor(Math.random() * 6) + 1,
+        Math.floor(Math.random() * 6) + 1,
+      ]);
+    }, 180);
+    return () => window.clearInterval(interval);
+  }, [rolling, wagerMode]);
+
   if (!wallet) return null;
 
   const actualBalance = wallet.balance;
@@ -96,10 +208,19 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
       return;
     }
 
+    setPlaying(true);
     setRolling(true);
     setMessage("");
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (wagerMode === "tai-xiu") {
+      for (let remaining = 5; remaining > 0; remaining--) {
+        setCountdown(remaining);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      setCountdown(0);
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
 
     const gameResponse = await fetch("/api/games", {
       method: "POST",
@@ -121,6 +242,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     };
     if (!gameResponse.ok || !gameData.wallet || !gameData.round) {
       setRolling(false);
+      setCountdown(0);
       setPlaying(false);
       setMessage(gameData.error || "Không thể lưu kết quả ván chơi. Vui lòng thử lại.");
       return;
@@ -289,31 +411,17 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 </div>
               )}
 
-              {wagerMode === "tai-xiu" ? <div className="grid gap-3 md:grid-cols-2">
-                <button
-                  onClick={() => {
-                    setPlaying(true);
-                    void rollGame("tai");
+              {wagerMode === "tai-xiu" ? (
+                <TaiXiuBoard
+                  onChoose={(choice) => {
+                    void rollGame(choice);
                   }}
-                  disabled={rolling || !betAmount && betType === "custom"}
-                  className="rounded-2xl border border-red-400/40 bg-red-500/10 px-6 py-4 font-bold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
-                >
-                  TÀI (&gt;10)
-                </button>
-                <button
-                  onClick={() => {
-                    setPlaying(true);
-                    void rollGame("xiu");
-                  }}
-                  disabled={rolling || !betAmount && betType === "custom"}
-                  className="rounded-2xl border border-blue-400/40 bg-blue-500/10 px-6 py-4 font-bold text-blue-200 transition hover:bg-blue-500/20 disabled:opacity-50"
-                >
-                  XỈU (&lt;=10)
-                </button>
-              </div> : <button
+                  disabled={rolling || (!betAmount && betType === "custom")}
+                  dice={[1, 3, 5]}
+                />
+              ) : <button
                 type="button"
                 onClick={() => {
-                  setPlaying(true);
                   void rollGame();
                 }}
                 disabled={rolling || (!betAmount && betType === "custom")}
@@ -325,23 +433,39 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
           ) : null}
 
           {playing && rolling && (
-            <div className="text-center space-y-6">
-              <p className="text-sm text-slate-300">Đang gieo xúc xắc...</p>
-              <div className="text-6xl animate-spin">*</div>
-            </div>
-          )}
+                wagerMode === "tai-xiu" ? (
+                  <div className="space-y-3">
+                    <p className="text-center text-sm font-semibold uppercase tracking-widest text-amber-200">Đang lắc xúc xắc</p>
+                    <TaiXiuBoard disabled rolling countdown={countdown} dice={rollingDice} />
+                  </div>
+                ) : (
+                  <div className="text-center space-y-6">
+                    <p className="text-sm text-slate-300">Đang gieo xúc xắc...</p>
+                    <div className="text-6xl animate-spin">*</div>
+                  </div>
+                )
+              )}
 
-          {gameResult && (
-            <div className="text-center space-y-6">
-              <div className="rounded-2xl border border-amber-500/50 bg-amber-500/20 p-6">
-                <p className="text-3xl font-bold">
-                  {gameResult.dice[0]} + {gameResult.dice[1]} + {gameResult.dice[2]} = {gameResult.total}
-                </p>
-                <p className="mt-2 text-sm text-slate-300">
-                  Kết quả: {gameResult.result === "tai" ? "TÀI" : "XỈU"}
-                </p>
-                <p className="mt-1 text-sm text-amber-200">Cược: {gameResult.wagerLabel}</p>
-              </div>
+              {gameResult && (
+                <div className="text-center space-y-6">
+                  {gameResult.wagerMode === "tai-xiu" ? (
+                    <TaiXiuBoard disabled dice={gameResult.dice} result={gameResult.result} />
+                  ) : (
+                    <div className="rounded-2xl border border-amber-500/50 bg-amber-500/20 p-6">
+                      <p className="text-3xl font-bold">
+                        {gameResult.dice[0]} + {gameResult.dice[1]} + {gameResult.dice[2]} = {gameResult.total}
+                      </p>
+                      <p className="mt-2 text-sm text-slate-300">
+                        Kết quả: {gameResult.result === "tai" ? "TÀI" : "XỈU"}
+                      </p>
+                      <p className="mt-1 text-sm text-amber-200">Cược: {gameResult.wagerLabel}</p>
+                    </div>
+                  )}
+                  {gameResult.wagerMode === "tai-xiu" && (
+                    <p className="text-sm text-slate-300">
+                      {gameResult.dice.join(" + ")} = {gameResult.total} · Cược: {gameResult.wagerLabel}
+                    </p>
+                  )}
 
               <div
                 className={`rounded-2xl border p-6 ${gameResult.won ? "border-emerald-500/50 bg-emerald-500/20" : "border-red-500/50 bg-red-500/20"}`}
