@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn, signOut, useSession } from "next-auth/react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { hasPasswordDiacritics } from "@/lib/password-validation";
@@ -15,24 +16,6 @@ type DeviceLoginNotification = {
   userAgent: string | null;
   createdAt: string;
 };
-
-const supportLinks = [
-  {
-    label: "Website",
-    href: "https://hy88-woad.vercel.app/",
-    value: "https://hy88-woad.vercel.app/",
-  },
-  {
-    label: "Facebook",
-    href: "https://www.facebook.com/duchuy23712",
-    value: "https://www.facebook.com/duchuy23712",
-  },
-  {
-    label: "Discord",
-    href: "https://discord.gg/tnSt9Ppb94",
-    value: "https://discord.gg/tnSt9Ppb94",
-  },
-];
 
 type WalletState = {
   balance: number;
@@ -120,6 +103,14 @@ const addDeviceAccount = (username: string) => {
     accounts.push(username);
     localStorage.setItem(getDeviceAccountsStorageKey(), JSON.stringify(accounts));
   }
+};
+
+type FullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+};
+
+type FullscreenHtmlElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
 function DeviceAccessGate({ children }: { children: ReactNode }) {
@@ -265,24 +256,46 @@ export default function HomePage() {
       Math.min(window.screen.width, window.screen.height) <= 600;
     if (!mobileUserAgent && !smallTouchScreen) return;
 
+    const fullscreenDocument = document as FullscreenDocument;
+    const root = document.documentElement as FullscreenHtmlElement;
     let requestPending = false;
-    const requestFullscreenOnTouch = () => {
-      const root = document.documentElement;
-      if (document.fullscreenElement) return;
-      if (requestPending || !root.requestFullscreen) return;
+    const isFullscreen = () => Boolean(
+      fullscreenDocument.fullscreenElement ?? fullscreenDocument.webkitFullscreenElement,
+    );
+    const requestFullscreenOnInteraction = () => {
+      if (isFullscreen() || requestPending) return;
+      const requestFullscreen = root.requestFullscreen?.bind(root) ??
+        root.webkitRequestFullscreen?.bind(root);
+      if (!requestFullscreen) return;
 
       requestPending = true;
-      void root.requestFullscreen()
-        .then(() => {
-          requestPending = false;
-        })
-        .catch(() => {
-          requestPending = false;
-        });
+      try {
+        void Promise.resolve(requestFullscreen())
+          .catch((error: unknown) => {
+            console.warn("Unable to enter fullscreen mode:", error);
+          })
+          .finally(() => {
+            requestPending = false;
+          });
+      } catch (error) {
+        requestPending = false;
+        console.warn("Unable to enter fullscreen mode:", error);
+      }
+    };
+    const handleFullscreenChange = () => {
+      if (isFullscreen()) requestPending = false;
     };
 
-    window.addEventListener("pointerdown", requestFullscreenOnTouch, true);
-    return () => window.removeEventListener("pointerdown", requestFullscreenOnTouch, true);
+    window.addEventListener("pointerup", requestFullscreenOnInteraction, true);
+    window.addEventListener("touchend", requestFullscreenOnInteraction, true);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    return () => {
+      window.removeEventListener("pointerup", requestFullscreenOnInteraction, true);
+      window.removeEventListener("touchend", requestFullscreenOnInteraction, true);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -834,9 +847,11 @@ export default function HomePage() {
 
               <div className="grid gap-8 lg:grid-cols-[minmax(280px,420px)_1fr] lg:items-center">
                 <div className="overflow-hidden rounded-2xl border border-cyan-400/40 bg-white p-4">
-                  <img
+                  <Image
                     src="/qr-zalopay.png"
                     alt="Mã QR ZaloPay của Admin"
+                    width={600}
+                    height={600}
                     className="aspect-square w-full object-contain"
                   />
                 </div>
