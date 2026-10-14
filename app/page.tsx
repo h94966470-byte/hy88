@@ -268,15 +268,14 @@ export default function HomePage() {
     let requestPending = false;
     const requestFullscreenOnTouch = () => {
       const root = document.documentElement;
-      if (document.fullscreenElement) {
-        window.removeEventListener("pointerdown", requestFullscreenOnTouch, true);
-        return;
-      }
+      if (document.fullscreenElement) return;
       if (requestPending || !root.requestFullscreen) return;
 
       requestPending = true;
       void root.requestFullscreen()
-        .then(() => window.removeEventListener("pointerdown", requestFullscreenOnTouch, true))
+        .then(() => {
+          requestPending = false;
+        })
         .catch(() => {
           requestPending = false;
         });
