@@ -93,6 +93,96 @@ export type AppSettings = {
   customRate: number | null;
 };
 
+export type DeviceLoginNotification = {
+  ipAddress: string | null;
+  userAgent: string | null;
+  deviceId: string;
+  createdAt: string;
+};
+
+export async function registerDeviceSession(
+  userId: string,
+  sessionId: string,
+  deviceId: string,
+  ipAddress: string | null,
+  userAgent: string | null,
+): Promise<void> {
+  await ensureDatabaseReady();
+  const notificationId = crypto.randomUUID();
+  await sql`
+    WITH active_session AS (
+      INSERT INTO active_device_sessions (
+        user_id, session_id, device_id, ip_address, user_agent, logged_in_at
+      )
+      VALUES (${userId}, ${sessionId}, ${deviceId}, ${ipAddress}, ${userAgent}, CURRENT_TIMESTAMP)
+      ON CONFLICT (user_id) DO UPDATE SET
+        session_id = EXCLUDED.session_id,
+        device_id = EXCLUDED.device_id,
+        ip_address = EXCLUDED.ip_address,
+        user_agent = EXCLUDED.user_agent,
+        logged_in_at = CURRENT_TIMESTAMP
+      RETURNING user_id, session_id, device_id, ip_address, user_agent, logged_in_at
+    )
+    INSERT INTO device_login_notifications (
+      id, user_id, session_id, device_id, ip_address, user_agent, created_at
+    )
+    SELECT ${notificationId}, user_id, session_id, device_id, ip_address, user_agent, logged_in_at
+    FROM active_session
+  `;
+}
+
+export async function isDeviceSessionActive(userId: string, sessionId: string): Promise<boolean> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    SELECT 1
+    FROM active_device_sessions
+    WHERE user_id = ${userId} AND session_id = ${sessionId}
+    LIMIT 1
+  `;
+  return result.rows.length > 0;
+}
+
+export async function getDeviceLoginNotifications(userId: string): Promise<{
+  currentDevice: DeviceLoginNotification | null;
+  recentLogins: DeviceLoginNotification[];
+}> {
+  await ensureDatabaseReady();
+  const [currentResult, recentResult] = await Promise.all([
+    sql`
+      SELECT device_id, ip_address, user_agent, logged_in_at
+      FROM active_device_sessions
+      WHERE user_id = ${userId}
+      LIMIT 1
+    `,
+    sql`
+      SELECT device_id, ip_address, user_agent, created_at
+      FROM device_login_notifications
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC
+      LIMIT 20
+    `,
+  ]);
+  const mapNotification = (row: {
+    device_id: string;
+    ip_address: string | null;
+    user_agent: string | null;
+    created_at?: string;
+    logged_in_at?: string;
+  }): DeviceLoginNotification => ({
+    deviceId: row.device_id,
+    ipAddress: row.ip_address,
+    userAgent: row.user_agent,
+    createdAt: row.created_at ?? row.logged_in_at ?? "",
+  });
+
+  return {
+    currentDevice: currentResult.rows[0]
+      ? mapNotification(currentResult.rows[0] as Parameters<typeof mapNotification>[0])
+      : null,
+    recentLogins: (recentResult.rows as Array<Parameters<typeof mapNotification>[0]>).map(mapNotification),
+  };
+}
+
 export function hashPassword(value: string) {
   return crypto.createHash("sha256").update(value.trim()).digest("hex");
 }

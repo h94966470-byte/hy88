@@ -7,6 +7,15 @@ import { hasPasswordDiacritics } from "@/lib/password-validation";
 import GameCenter from "./components/GameCenter";
 
 const menuItems = ["Ví", "Khuyến mãi", "Hỗ trợ"];
+let simulationDisclaimerDismissed = false;
+
+type DeviceLoginNotification = {
+  deviceId: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+};
+
 const supportLinks = [
   {
     label: "Website",
@@ -81,11 +90,27 @@ const getDeviceAccounts = (): string[] => {
 };
 
 function SimulationDisclaimer() {
+  const [visible, setVisible] = useState(!simulationDisclaimerDismissed);
+  if (!visible) return null;
+
+  const dismiss = () => {
+    simulationDisclaimerDismissed = true;
+    setVisible(false);
+  };
+
   return (
-    <footer className="simulation-disclaimer fixed bottom-3 right-3 z-40 w-[min(26rem,calc(100vw-1.5rem))] rounded-xl border border-amber-400/20 bg-slate-950/90 px-4 py-3 text-right text-[11px] leading-relaxed text-slate-400 shadow-lg backdrop-blur-md max-md:bottom-1 max-md:right-1 max-md:w-[min(13rem,calc(100vw-0.5rem))] max-md:rounded-lg max-md:px-2 max-md:py-1.5 max-md:text-[8px] max-md:leading-snug">
-      <p>Mọi thứ trên web này đều là giả lập, không quy đổi ra tiền mặt, không cổ xúy chơi cờ bạc, đỏ đen.</p>
-      <p className="mt-1 font-semibold text-amber-300 max-md:mt-0.5">Hãy tránh xa cờ bạc.</p>
-    </footer>
+    <button
+      type="button"
+      onClick={dismiss}
+      aria-label="Đóng thông báo"
+      className="simulation-disclaimer fixed inset-0 z-[100] flex cursor-pointer items-start justify-center bg-black/75 px-4 pt-[10vh] text-center backdrop-blur-sm"
+    >
+      <span className="w-full max-w-2xl rounded-2xl border border-amber-400/40 bg-slate-950 px-6 py-7 text-base leading-relaxed text-slate-200 shadow-[0_24px_80px_rgba(0,0,0,0.75)] sm:px-10 sm:py-9 sm:text-lg">
+        <span className="block">Mọi thứ trên web này đều là giả lập, không quy đổi ra tiền mặt, không cổ xúy chơi cờ bạc, đỏ đen.</span>
+        <span className="mt-3 block font-bold text-amber-300">Hãy tránh xa cờ bạc.</span>
+        <span className="mt-5 block text-xs text-slate-400">Chạm hoặc nhấn bất kỳ đâu để đóng</span>
+      </span>
+    </button>
   );
 }
 
@@ -167,12 +192,72 @@ export default function HomePage() {
   const [walletLoading, setWalletLoading] = useState(false);
   const [repaymentAmount, setRepaymentAmount] = useState("");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [deviceNotifications, setDeviceNotifications] = useState<{
+    currentDevice: DeviceLoginNotification | null;
+    recentLogins: DeviceLoginNotification[];
+  } | null>(null);
   const [animatedBalance, setAnimatedBalance] = useState(0);
   const animatedBalanceRef = useRef(0);
   const hasInitializedBalance = useRef(false);
   const balanceTarget = wallet?.balance;
 
   const isAuthenticated = status === "authenticated" && !!session?.user;
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let cancelled = false;
+    const checkDeviceSession = async () => {
+      try {
+        const response = await fetch("/api/auth/session", { cache: "no-store" });
+        if (!response.ok) return;
+        const currentSession = (await response.json()) as {
+          deviceSessionActive?: boolean;
+          user?: { id?: string };
+        };
+        if (!cancelled && (currentSession.deviceSessionActive === false || currentSession.user?.id === "guest")) {
+          setMessage("Tài khoản đã đăng nhập trên thiết bị khác. Thiết bị này đã được đăng xuất.");
+          await signOut({ redirect: false });
+        }
+      } catch (error) {
+        console.error("Check active device session error:", error);
+      }
+    };
+
+    void checkDeviceSession();
+    const interval = window.setInterval(() => void checkDeviceSession(), 5000);
+    window.addEventListener("focus", checkDeviceSession);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", checkDeviceSession);
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || activeMenu !== "Thông báo") return;
+
+    let cancelled = false;
+    void fetch("/api/device-notifications", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Không thể tải thông báo thiết bị");
+        return response.json() as Promise<{
+          currentDevice: DeviceLoginNotification | null;
+          recentLogins: DeviceLoginNotification[];
+        }>;
+      })
+      .then((data) => {
+        if (!cancelled) setDeviceNotifications(data);
+      })
+      .catch((error: unknown) => {
+        console.error("Load device notifications error:", error);
+        if (!cancelled) setMessage("Không thể tải thông báo thiết bị.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeMenu, isAuthenticated]);
 
   useEffect(() => {
     const mobileUserAgent = /Android|iPhone|iPod|IEMobile|BlackBerry|Opera Mini|Mobile/i.test(navigator.userAgent);
@@ -457,6 +542,7 @@ export default function HomePage() {
       const res = await signIn("credentials", {
         username,
         password,
+        deviceId: getOrCreateDeviceId(),
         redirect: false,
       });
 
@@ -596,7 +682,40 @@ export default function HomePage() {
           ) : activeMenu === "Thông báo" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
               <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Thông báo</p>
-              <h1 className="mt-3 text-3xl font-bold text-white">Chưa có thông báo</h1>
+              <h1 className="mt-3 text-3xl font-bold text-white">Thiết bị đăng nhập</h1>
+              {!deviceNotifications ? (
+                <p className="mt-5 text-slate-300">Đang tải thông tin thiết bị...</p>
+              ) : (
+                <div className="mt-6 space-y-6">
+                  <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-5">
+                    <h2 className="font-semibold text-emerald-200">Phiên đăng nhập hiện tại</h2>
+                    {deviceNotifications.currentDevice ? (
+                      <div className="mt-3 space-y-2 text-sm text-slate-200">
+                        <p>IP: <span className="font-semibold">{deviceNotifications.currentDevice.ipAddress || "Không xác định"}</span></p>
+                        <p>Thiết bị/trình duyệt: {deviceNotifications.currentDevice.userAgent || "Không xác định"}</p>
+                        <p>Đăng nhập lúc: {new Date(deviceNotifications.currentDevice.createdAt).toLocaleString("vi-VN")}</p>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-300">Chưa có thông tin phiên đăng nhập.</p>
+                    )}
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-white">Lịch sử đăng nhập gần đây</h2>
+                    <div className="mt-3 space-y-3">
+                      {deviceNotifications.recentLogins.map((login, index) => (
+                        <div key={`${login.deviceId}-${login.createdAt}-${index}`} className="rounded-xl border border-white/10 bg-slate-950/60 p-4 text-sm text-slate-300">
+                          <p>IP: <span className="font-medium text-white">{login.ipAddress || "Không xác định"}</span></p>
+                          <p className="mt-1 break-words">{login.userAgent || "Không xác định thiết bị"}</p>
+                          <p className="mt-1 text-xs text-slate-400">{new Date(login.createdAt).toLocaleString("vi-VN")}</p>
+                        </div>
+                      ))}
+                      {!deviceNotifications.recentLogins.length && (
+                        <p className="text-sm text-slate-400">Chưa có lịch sử đăng nhập.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : activeMenu === "Ví" ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">

@@ -65,6 +65,34 @@ export async function initializeDatabase() {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS active_device_sessions (
+        user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        session_id UUID NOT NULL,
+        device_id VARCHAR(255) NOT NULL,
+        ip_address VARCHAR(255),
+        user_agent TEXT,
+        logged_in_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS device_login_notifications (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        session_id UUID NOT NULL,
+        device_id VARCHAR(255) NOT NULL,
+        ip_address VARCHAR(255),
+        user_agent TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_device_login_notifications_user_created
+      ON device_login_notifications(user_id, created_at DESC);
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS user_wallets (
         user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         balance BIGINT NOT NULL DEFAULT 100000,
