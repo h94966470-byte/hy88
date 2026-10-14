@@ -453,10 +453,10 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     await settleBet(bet);
   };
 
-  const visibleHistory = historyForPanel.slice(-40);
+  const visibleHistory = historyForPanel.slice(-20);
   const chartPoints = visibleHistory.map((round, index) => {
     const x = visibleHistory.length === 1 ? 50 : (index / (visibleHistory.length - 1)) * 100;
-    const y = round.result === "tai" ? 22 : 78;
+    const y = round.result === "tai" ? 7 : 35;
     return `${x},${y}`;
   });
   const chartPath = chartPoints.length > 1
@@ -468,8 +468,8 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
         return `${path} Q ${midpoint},${previousY} ${currentX},${currentY}`;
       }, "")
     : chartPoints.length === 1
-      ? `M 0,50 Q 50,${chartPoints[0].split(",")[1]} 100,50`
-      : "M 0,50 C 20,12 30,88 50,50 S 80,12 100,50";
+      ? `M 0,21 Q 50,${chartPoints[0].split(",")[1]} 100,21`
+      : "M 0,21 C 20,7 30,35 50,21 S 80,7 100,21";
 
   return (
     <div className="mx-auto w-full max-w-3xl">
@@ -735,13 +735,13 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
               <span>Kết quả các ván</span>
               <span className="font-bold text-white">{totalRounds} ván</span>
             </div>
-            <div className="relative flex aspect-[1.6] items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3 sm:aspect-[2.4]">
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full overflow-visible" role="img" aria-label="Biểu đồ kết quả các ván">
-                <path d="M 0,50 H 100" stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 3" />
+            <div className="relative flex aspect-[2.4] items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3">
+              <svg viewBox="0 0 100 42" className="h-full w-full" role="img" aria-label="Biểu đồ kết quả các ván">
+                <path d="M 0,21 H 100" stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 3" />
                 <path d={chartPath} fill="none" stroke="#c4b5fd" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
                 {chartPoints.map((point, index) => {
                   const [x, y] = point.split(",");
-                  return <circle key={`${point}-${index}`} cx={x} cy={y} r="0.9" fill="#fbbf24" />;
+                  return <circle key={`${point}-${index}`} cx={x} cy={y} r="0.7" fill="#fbbf24" />;
                 })}
               </svg>
             </div>
