@@ -712,7 +712,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
             role="dialog"
             aria-modal="true"
             aria-labelledby="game-history-title"
-            className="max-h-[90vh] w-full max-w-2xl space-y-5 overflow-y-auto rounded-3xl border border-amber-300/40 bg-slate-900 p-5 shadow-2xl sm:p-8"
+            className="max-h-[90vh] w-full max-w-5xl space-y-5 overflow-y-auto rounded-3xl border border-amber-300/40 bg-slate-900 p-5 shadow-2xl sm:p-8"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
@@ -734,7 +734,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
               <span>Kết quả các ván</span>
               <span className="font-bold text-white">{totalRounds} ván</span>
             </div>
-            <div className="relative flex aspect-[1.6] items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3">
+            <div className="relative flex aspect-[1.6] items-center justify-center rounded-2xl border border-violet-500/30 bg-violet-500/10 p-3 sm:aspect-[2.4]">
               <svg viewBox="0 0 100 100" className="h-full w-full overflow-visible" role="img" aria-label="Biểu đồ kết quả các ván">
                 <path d="M 0,50 H 100" stroke="currentColor" strokeOpacity="0.2" strokeDasharray="2 3" />
                 <path d={chartPath} fill="none" stroke="#c4b5fd" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
