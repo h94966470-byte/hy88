@@ -642,7 +642,7 @@ export default function HomePage() {
           ) : (
             <>
               <div className="mb-8 rounded-3xl border border-amber-400/20 bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 p-6">
-                <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Game hub</p>
+                <p className="text-sm uppercase tracking-[0.24em] text-amber-300">HY88</p>
                 <h1 className="mt-3 text-4xl font-bold">Xin chào, {session.user?.name || "Người chơi"}</h1>
               </div>
 

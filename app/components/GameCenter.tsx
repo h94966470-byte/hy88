@@ -300,7 +300,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
         <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 shadow-2xl">
           <div className="mb-8">
             <p className="text-sm uppercase tracking-[0.24em] text-amber-300">Tài Xỉu</p>
-            <h1 className="mt-2 text-3xl font-bold text-white">Cuộc chơi Tài Xỉu</h1>
+            <h1 className="mt-2 text-3xl font-bold text-white">Tài Xỉu</h1>
           </div>
 
           <div className="mb-8 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5">
