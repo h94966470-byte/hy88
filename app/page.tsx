@@ -82,9 +82,9 @@ const getDeviceAccounts = (): string[] => {
 
 function SimulationDisclaimer() {
   return (
-    <footer className="fixed bottom-3 right-3 z-40 w-[min(26rem,calc(100vw-1.5rem))] rounded-xl border border-amber-400/20 bg-slate-950/90 px-4 py-3 text-right text-[11px] leading-relaxed text-slate-400 shadow-lg backdrop-blur-md max-md:bottom-2 max-md:right-2 max-md:w-[min(18rem,calc(100vw-1rem))] max-md:px-3 max-md:py-2 max-md:text-[10px]">
+    <footer className="fixed bottom-3 right-3 z-40 w-[min(26rem,calc(100vw-1.5rem))] rounded-xl border border-amber-400/20 bg-slate-950/90 px-4 py-3 text-right text-[11px] leading-relaxed text-slate-400 shadow-lg backdrop-blur-md max-md:bottom-1 max-md:right-1 max-md:w-[min(13rem,calc(100vw-0.5rem))] max-md:rounded-lg max-md:px-2 max-md:py-1.5 max-md:text-[8px] max-md:leading-snug">
       <p>Mọi thứ trên web này đều là giả lập, không quy đổi ra tiền mặt, không cổ xúy chơi cờ bạc, đỏ đen.</p>
-      <p className="mt-1 font-semibold text-amber-300">Hãy tránh xa cờ bạc.</p>
+      <p className="mt-1 font-semibold text-amber-300 max-md:mt-0.5">Hãy tránh xa cờ bạc.</p>
     </footer>
   );
 }
