@@ -184,6 +184,27 @@ export default function HomePage() {
       if (showLoading) setWalletLoading(true);
 
       try {
+        if (showLoading) {
+          try {
+            const recoveryResponse = await fetch("/api/games", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "recover" }),
+              cache: "no-store",
+            });
+            if (!cancelled && recoveryResponse.ok) {
+              const recoveryData = (await recoveryResponse.json()) as { recovered: number };
+              if (recoveryData.recovered > 0) {
+                setMessage("Ván chơi chưa mở bát đã được tự động chốt sau khi tải lại ứng dụng.");
+              }
+            } else if (!cancelled) {
+              setMessage("Không thể tự động chốt ván chơi đang chờ.");
+            }
+          } catch {
+            if (!cancelled) setMessage("Không thể tự động chốt ván chơi đang chờ.");
+          }
+        }
+
         const res = await fetch("/api/wallet", { cache: "no-store" });
         if (cancelled) return;
         if (res.ok) {

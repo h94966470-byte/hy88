@@ -5,6 +5,7 @@ import {
   getGameRoundCount,
   getRecentGameRounds,
   prepareGameRound,
+  recoverPendingGameRounds,
   resolveGameRound,
   settlePreparedGameRound,
   StoredGameRound,
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json()) as {
-      action?: "prepare" | "settle";
+      action?: "prepare" | "settle" | "recover";
       pendingId?: string;
       amount?: number;
       betType?: string;
@@ -41,11 +42,24 @@ export async function POST(req: NextRequest) {
       selectedNumber?: number | null;
       playerChoice?: string | null;
     };
+    if (body.action === "recover") {
+      const games = await recoverPendingGameRounds(userId);
+      return NextResponse.json({
+        ok: true,
+        recovered: games.length,
+        wallet: games.length ? games[games.length - 1].wallet : null,
+        rounds: games.map((game) => game.round),
+      });
+    }
+
     if (body.action === "settle") {
       if (!body.pendingId || !/^[0-9a-f-]{36}$/i.test(body.pendingId)) {
         return NextResponse.json({ error: "Ván chơi không hợp lệ hoặc đã hết hạn" }, { status: 400 });
       }
       const game = await settlePreparedGameRound(userId, body.pendingId);
+      if (!game) {
+        return NextResponse.json({ error: "Ván chơi không hợp lệ hoặc đã được chốt" }, { status: 409 });
+      }
       return NextResponse.json({ ok: true, ...game });
     }
 
@@ -85,9 +99,6 @@ export async function POST(req: NextRequest) {
     }
     if (error instanceof Error && error.message === "INVALID_BET_AMOUNT") {
       return NextResponse.json({ error: "Số tiền cược không hợp lệ hoặc số dư đã thay đổi" }, { status: 409 });
-    }
-    if (error instanceof Error && error.message === "PREPARED_GAME_ROUND_INVALID") {
-      return NextResponse.json({ error: "Số dư đã thay đổi hoặc ván chơi đã hết hạn. Vui lòng đặt cược lại." }, { status: 409 });
     }
     return NextResponse.json({ error: "Không thể lưu ván chơi" }, { status: 500 });
   }

@@ -541,6 +541,7 @@ export async function prepareGameRound(
   playerChoice: "tai" | "xiu" | null,
 ): Promise<{ id: string; dice: number[] }> {
   await ensureDatabaseReady();
+  await recoverPendingGameRounds(userId);
   const wallet = await getOrCreateWallet(userId);
   const expectedAmount = betType === "all" ? wallet.balance : betType === "half" ? Math.floor(wallet.balance / 2) : amount;
   if (!Number.isSafeInteger(expectedAmount) || expectedAmount <= 0 || expectedAmount > wallet.balance ||
@@ -606,7 +607,6 @@ export async function prepareGameRound(
     dice,
   };
   const id = crypto.randomUUID();
-  await sql`DELETE FROM pending_game_rounds WHERE user_id = ${userId} AND created_at < CURRENT_TIMESTAMP - INTERVAL '10 minutes'`;
   await sql`
     INSERT INTO pending_game_rounds (
       id, user_id, expected_balance, expected_debt, balance_delta, debt_delta,
@@ -625,54 +625,57 @@ export async function prepareGameRound(
 export async function settlePreparedGameRound(
   userId: string,
   pendingId: string,
-): Promise<{ wallet: StoredWallet; round: StoredGameRound; profit: number; interestDebt: number }> {
+): Promise<{ wallet: StoredWallet; round: StoredGameRound; profit: number; interestDebt: number } | null> {
   await ensureDatabaseReady();
   const roundId = crypto.randomUUID();
   const result = await sql`
-    WITH pending AS (
-      DELETE FROM pending_game_rounds
+    WITH pending AS MATERIALIZED (
+      SELECT *
+      FROM pending_game_rounds
       WHERE id = ${pendingId}
         AND user_id = ${userId}
-        AND created_at >= CURRENT_TIMESTAMP - INTERVAL '10 minutes'
-      RETURNING *
+      FOR UPDATE
     ),
     updated AS (
       UPDATE user_wallets AS wallet
-      SET balance = wallet.balance + pending.balance_delta,
-          debt = wallet.debt + pending.debt_delta,
+      SET balance = GREATEST(wallet.balance + pending.profit, 0),
+          debt = wallet.debt + pending.interest_debt +
+            GREATEST(-(wallet.balance + pending.profit), 0),
           updated_at = CURRENT_TIMESTAMP
       FROM pending
       WHERE wallet.user_id = pending.user_id
-        AND wallet.balance = pending.expected_balance
-        AND wallet.debt = pending.expected_debt
-        AND wallet.balance + pending.balance_delta >= 0
-        AND wallet.debt + pending.debt_delta >= 0
-      RETURNING wallet.balance, wallet.debt, wallet.win_streak, wallet.loss_streak,
+      RETURNING wallet.user_id, wallet.balance, wallet.debt, wallet.win_streak, wallet.loss_streak,
         wallet.daily_claim_date, wallet.newbie_step, wallet.newbie_daily_claim_date, wallet.created_at
+    ),
+    consumed AS (
+      DELETE FROM pending_game_rounds AS pending
+      USING updated
+      WHERE pending.id = ${pendingId}
+        AND pending.user_id = updated.user_id
+      RETURNING pending.*
     ),
     inserted AS (
       INSERT INTO game_rounds (
         id, user_id, result, player_choice, won, wager_mode, selected_number,
         total, dice_1, dice_2, dice_3
       )
-      SELECT ${roundId}, pending.user_id, pending.result, pending.player_choice, pending.won,
-        pending.wager_mode, pending.selected_number, pending.total, pending.dice_1,
-        pending.dice_2, pending.dice_3
-      FROM pending
-      INNER JOIN updated ON TRUE
+      SELECT ${roundId}, consumed.user_id, consumed.result, consumed.player_choice, consumed.won,
+        consumed.wager_mode, consumed.selected_number, consumed.total, consumed.dice_1,
+        consumed.dice_2, consumed.dice_3
+      FROM consumed
       RETURNING id
     )
     SELECT updated.balance, updated.debt, updated.win_streak, updated.loss_streak,
       updated.daily_claim_date, updated.newbie_step, updated.newbie_daily_claim_date,
-      updated.created_at, pending.result, pending.player_choice, pending.won,
-      pending.wager_mode, pending.selected_number, pending.total, pending.dice_1,
-      pending.dice_2, pending.dice_3, pending.profit, pending.interest_debt
-    FROM pending
-    INNER JOIN updated ON TRUE
+      updated.created_at, consumed.result, consumed.player_choice, consumed.won,
+      consumed.wager_mode, consumed.selected_number, consumed.total, consumed.dice_1,
+      consumed.dice_2, consumed.dice_3, consumed.profit, consumed.interest_debt
+    FROM consumed
+    INNER JOIN updated ON updated.user_id = consumed.user_id
     INNER JOIN inserted ON TRUE
   `;
   if (!result.rows.length) {
-    throw new Error("PREPARED_GAME_ROUND_INVALID");
+    return null;
   }
 
   const row = result.rows[0] as {
@@ -705,6 +708,26 @@ export async function settlePreparedGameRound(
     profit: Number(row.profit),
     interestDebt: Number(row.interest_debt),
   };
+}
+
+export async function recoverPendingGameRounds(
+  userId: string,
+): Promise<Array<{ wallet: StoredWallet; round: StoredGameRound; profit: number; interestDebt: number }>> {
+  await ensureDatabaseReady();
+  const pendingRounds = await sql`
+    SELECT id
+    FROM pending_game_rounds
+    WHERE user_id = ${userId}
+    ORDER BY created_at ASC, id ASC
+  `;
+  const settledRounds: Array<{ wallet: StoredWallet; round: StoredGameRound; profit: number; interestDebt: number }> = [];
+
+  for (const row of pendingRounds.rows as Array<{ id: string }>) {
+    const settled = await settlePreparedGameRound(userId, row.id);
+    if (settled) settledRounds.push(settled);
+  }
+
+  return settledRounds;
 }
 
 export async function getRecentGameRounds(limit = 30): Promise<StoredGameRound[]> {
