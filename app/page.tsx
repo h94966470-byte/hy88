@@ -761,20 +761,12 @@ export default function HomePage() {
                 <p className="mt-2 text-3xl font-bold text-red-100">{(wallet?.debt ?? 0).toLocaleString("vi-VN")} VND</p>
               </div>
 
-              <div className="mt-6 grid gap-4 lg:grid-cols-3">
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-5">
                   <button type="button" onClick={handleDailyBonus} disabled={loading} className="w-full text-left transition disabled:opacity-50">
                     <p className="text-sm text-amber-200">Daily</p>
                     <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
                     <p className="mt-2 text-sm text-slate-300">Nhận mỗi ngày, reset 00:00 ngày mai.</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleQuickRepay("half")}
-                    disabled={loading || !wallet?.debt}
-                    className="mt-4 w-full rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-center font-semibold text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Trả nửa nợ
                   </button>
                 </div>
 
@@ -783,14 +775,6 @@ export default function HomePage() {
                     <p className="text-sm text-red-200">Vay nợ</p>
                     <p className="mt-2 text-2xl font-bold text-white">+50.000 VND</p>
                     <p className="mt-2 text-sm text-slate-300">Tối đa 2.000.000 VND tiền nợ.</p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleQuickRepay("all")}
-                    disabled={loading || !wallet?.debt}
-                    className="mt-4 w-full rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-center font-semibold text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Trả hết nợ
                   </button>
                 </div>
 
@@ -811,6 +795,32 @@ export default function HomePage() {
                       ? "Bạn đã hoàn tất 7 ngày."
                       : "Ngày 1: 300k • Ngày 2: 200k • Ngày 3-7: 100k"}
                   </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleQuickRepay("half")}
+                  disabled={loading || !wallet?.debt}
+                  className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-5 text-left transition hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <p className="text-sm text-emerald-200">Trả nửa nợ</p>
+                  <p className="mt-2 text-2xl font-bold text-white">
+                    {wallet?.debt ? `${Math.ceil(wallet.debt / 2).toLocaleString("vi-VN")} VND` : "0 VND"}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-300">Thanh toán một nửa khoản nợ hiện tại.</p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleQuickRepay("all")}
+                  disabled={loading || !wallet?.debt}
+                  className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-5 text-left transition hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <p className="text-sm text-emerald-200">Trả hết nợ</p>
+                  <p className="mt-2 text-2xl font-bold text-white">
+                    {(wallet?.debt ?? 0).toLocaleString("vi-VN")} VND
+                  </p>
+                  <p className="mt-2 text-sm text-slate-300">Thanh toán toàn bộ khoản nợ hiện tại.</p>
                 </button>
 
                 <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-5">
