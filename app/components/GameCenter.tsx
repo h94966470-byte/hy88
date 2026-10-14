@@ -453,7 +453,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
     await settleBet(bet);
   };
 
-  const visibleHistory = historyForPanel.slice(-20);
+  const visibleHistory = historyForPanel.slice(-35);
   const chartPoints = visibleHistory.map((round, index) => {
     const x = visibleHistory.length === 1 ? 50 : (index / (visibleHistory.length - 1)) * 100;
     const y = round.result === "tai" ? 22 : 78;
