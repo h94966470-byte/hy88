@@ -709,14 +709,18 @@ export default function HomePage() {
                   {item}
                 </button>
               ))}
+              <button
+                type="button"
+                style={{ animationDelay: `${menuItems.length * 60}ms` }}
+                className="auth-field auth-btn rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-left font-semibold text-emerald-200 transition hover:border-emerald-300/70 hover:bg-emerald-500/20"
+                onClick={() => {
+                  setIsBalanceHistoryOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                Biến động số dư
+              </button>
             </nav>
-            <button
-              type="button"
-              onClick={() => setIsBalanceHistoryOpen(true)}
-              className="col-start-2 row-start-3 justify-self-start rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-300/70 hover:bg-emerald-500/20 sm:row-start-2"
-            >
-              Biến động số dư
-            </button>
           </div>
         </header>
 
