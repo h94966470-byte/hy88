@@ -416,7 +416,6 @@ export async function getBalanceHistory(userId: string): Promise<BalanceHistory>
       FROM wallet_balance_transactions
       WHERE user_id = ${userId}
       ORDER BY created_at DESC, id DESC
-      LIMIT 20
     `,
   ]);
 
