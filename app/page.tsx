@@ -2,8 +2,9 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { hasPasswordDiacritics } from "@/lib/password-validation";
+import BalanceHistoryModal from "./components/BalanceHistoryModal";
 import GameCenter from "./components/GameCenter";
 
 const menuItems = ["Ví", "Khuyến mãi", "Hỗ trợ"];
@@ -171,6 +172,7 @@ export default function HomePage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [activeMenu, setActiveMenu] = useState<string>("Trang chủ");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isBalanceHistoryOpen, setIsBalanceHistoryOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -186,6 +188,7 @@ export default function HomePage() {
     currentDevice: DeviceLoginNotification | null;
     recentLogins: DeviceLoginNotification[];
   } | null>(null);
+  const closeBalanceHistory = useCallback(() => setIsBalanceHistoryOpen(false), []);
   const [animatedBalance, setAnimatedBalance] = useState(0);
   const animatedBalanceRef = useRef(0);
   const hasInitializedBalance = useRef(false);
@@ -707,6 +710,13 @@ export default function HomePage() {
                 </button>
               ))}
             </nav>
+            <button
+              type="button"
+              onClick={() => setIsBalanceHistoryOpen(true)}
+              className="col-start-2 row-start-3 justify-self-start rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-200 transition hover:border-emerald-300/70 hover:bg-emerald-500/20 sm:row-start-2"
+            >
+              Biến động số dư
+            </button>
           </div>
         </header>
 
@@ -948,6 +958,7 @@ export default function HomePage() {
             </>
           )}
         </section>
+        {isBalanceHistoryOpen && <BalanceHistoryModal onClose={closeBalanceHistory} />}
         <SimulationDisclaimer />
         </main>
       </DeviceAccessGate>

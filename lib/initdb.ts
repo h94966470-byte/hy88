@@ -122,6 +122,57 @@ export async function initializeDatabase() {
     `;
 
     await sql`
+      CREATE TABLE IF NOT EXISTS wallet_balance_transactions (
+        id BIGSERIAL PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount BIGINT NOT NULL CHECK (amount <> 0),
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_wallet_balance_transactions_user_created
+      ON wallet_balance_transactions(user_id, created_at DESC);
+    `;
+
+    await sql`
+      CREATE OR REPLACE FUNCTION record_wallet_balance_transaction()
+      RETURNS TRIGGER
+      LANGUAGE plpgsql
+      AS $$
+      BEGIN
+        IF TG_OP = 'INSERT' AND NEW.balance <> 0 THEN
+          INSERT INTO wallet_balance_transactions (user_id, amount)
+          VALUES (NEW.user_id, NEW.balance);
+        ELSIF TG_OP = 'UPDATE' AND NEW.balance IS DISTINCT FROM OLD.balance THEN
+          INSERT INTO wallet_balance_transactions (user_id, amount)
+          VALUES (NEW.user_id, NEW.balance - OLD.balance);
+        END IF;
+        RETURN NEW;
+      END;
+      $$;
+    `;
+
+    await sql`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_trigger
+          WHERE tgname = 'wallet_balance_transactions_after_change'
+            AND tgrelid = 'user_wallets'::regclass
+            AND NOT tgisinternal
+        ) THEN
+          EXECUTE 'CREATE TRIGGER wallet_balance_transactions_after_change
+              AFTER INSERT OR UPDATE ON user_wallets
+            FOR EACH ROW
+            EXECUTE FUNCTION record_wallet_balance_transaction()';
+        END IF;
+      END;
+      $$;
+    `;
+
+    await sql`
       CREATE TABLE IF NOT EXISTS app_settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         custom_rate NUMERIC(5, 4),

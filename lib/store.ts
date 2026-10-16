@@ -45,6 +45,14 @@ export type StoredWallet = {
   createdAt: string;
 };
 
+export type BalanceHistory = {
+  today: { spent: number; received: number };
+  last7Days: { spent: number; received: number };
+  last30Days: { spent: number; received: number };
+  allTime: { spent: number; received: number };
+  transactions: Array<{ id: number; amount: number; createdAt: string }>;
+};
+
 export type StoredGameRound = {
   result: "tai" | "xiu";
   playerChoice: "tai" | "xiu";
@@ -381,6 +389,54 @@ export async function getOrCreateWallet(userId: string): Promise<StoredWallet> {
     WHERE user_id = ${userId}
   `;
   return mapWallet(result.rows[0] as WalletRow);
+}
+
+export async function getBalanceHistory(userId: string): Promise<BalanceHistory> {
+  await ensureDatabaseReady();
+  const [summaryResult, transactionsResult] = await Promise.all([
+    sql`
+      WITH bounds AS (
+        SELECT date_trunc('day', timezone('Asia/Ho_Chi_Minh', CURRENT_TIMESTAMP)) - interval '7 hours' AS today_start
+      )
+      SELECT
+        COALESCE(SUM(-t.amount) FILTER (WHERE t.amount < 0 AND t.created_at >= b.today_start), 0) AS today_spent,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.amount > 0 AND t.created_at >= b.today_start), 0) AS today_received,
+        COALESCE(SUM(-t.amount) FILTER (WHERE t.amount < 0 AND t.created_at >= b.today_start - interval '6 days'), 0) AS last_7_days_spent,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.amount > 0 AND t.created_at >= b.today_start - interval '6 days'), 0) AS last_7_days_received,
+        COALESCE(SUM(-t.amount) FILTER (WHERE t.amount < 0 AND t.created_at >= b.today_start - interval '29 days'), 0) AS last_30_days_spent,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.amount > 0 AND t.created_at >= b.today_start - interval '29 days'), 0) AS last_30_days_received,
+        COALESCE(SUM(-t.amount) FILTER (WHERE t.amount < 0), 0) AS all_time_spent,
+        COALESCE(SUM(t.amount) FILTER (WHERE t.amount > 0), 0) AS all_time_received
+      FROM wallet_balance_transactions AS t
+      CROSS JOIN bounds AS b
+      WHERE t.user_id = ${userId}
+    `,
+    sql`
+      SELECT id, amount, created_at
+      FROM wallet_balance_transactions
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC, id DESC
+      LIMIT 20
+    `,
+  ]);
+
+  const summary = summaryResult.rows[0] as Record<string, string | number>;
+  const transactions = transactionsResult.rows as Array<{
+    id: number | string;
+    amount: number | string;
+    created_at: string;
+  }>;
+  return {
+    today: { spent: Number(summary.today_spent), received: Number(summary.today_received) },
+    last7Days: { spent: Number(summary.last_7_days_spent), received: Number(summary.last_7_days_received) },
+    last30Days: { spent: Number(summary.last_30_days_spent), received: Number(summary.last_30_days_received) },
+    allTime: { spent: Number(summary.all_time_spent), received: Number(summary.all_time_received) },
+    transactions: transactions.map((transaction) => ({
+      id: Number(transaction.id),
+      amount: Number(transaction.amount),
+      createdAt: transaction.created_at,
+    })),
+  };
 }
 
 export async function resolveDiceBet(userId: string, betAmount: number): Promise<{ isWin: boolean; newBalance: number }> {
