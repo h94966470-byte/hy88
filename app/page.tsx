@@ -712,7 +712,7 @@ export default function HomePage() {
               <button
                 type="button"
                 style={{ animationDelay: `${menuItems.length * 60}ms` }}
-                className="auth-field auth-btn rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-left font-semibold text-emerald-200 transition hover:border-emerald-300/70 hover:bg-emerald-500/20"
+                className="auth-field auth-btn rounded-lg border border-amber-400/20 bg-slate-950/20 px-3 py-2 text-left font-semibold text-slate-300 transition hover:border-amber-400/50 hover:text-amber-100"
                 onClick={() => {
                   setIsBalanceHistoryOpen(true);
                   setIsMobileMenuOpen(false);
