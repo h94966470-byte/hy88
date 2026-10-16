@@ -398,7 +398,7 @@ export default function HomePage() {
     let frame = 0;
     const start = performance.now();
     const from = animatedBalanceRef.current;
-    const duration = 1100;
+    const duration = 1500;
     const animate = (now: number) => {
       const progress = Math.min((now - start) / duration, 1);
       const easedProgress = 1 - (1 - progress) ** 3;
