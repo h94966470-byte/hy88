@@ -693,14 +693,14 @@ export default function HomePage() {
             <nav
               id="mobile-navigation"
               aria-label="Điều hướng chính"
-              className={`${isMobileMenuOpen ? "flex" : "hidden"} w-full flex-col gap-1 border-t border-white/10 pt-3 text-sm text-slate-300`}
+              className={`${isMobileMenuOpen ? "grid" : "hidden"} w-full grid-cols-2 gap-1 border-t border-white/10 pt-3 text-sm text-slate-300`}
             >
               {menuItems.map((item, index) => (
                 <button
                   key={item}
                   type="button"
                   style={{ animationDelay: `${index * 60}ms` }}
-                  className={`auth-field auth-btn rounded-lg border px-3 py-2 text-left transition ${activeMenu === item ? "auth-btn-active border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
+                  className={`auth-field auth-btn rounded-lg border px-3 py-2 text-left transition ${item === "Ví" ? "col-start-1 row-start-1" : item === "Khuyến mãi" ? "col-start-2 row-start-1" : "col-start-2 row-start-2"} ${activeMenu === item ? "auth-btn-active border-amber-400/60 bg-amber-500/20 text-amber-200" : "border-amber-400/20 bg-slate-950/20 text-slate-300 hover:border-amber-400/50 hover:text-amber-100"}`}
                   onClick={() => {
                     setActiveMenu(item);
                     setIsMobileMenuOpen(false);
@@ -712,7 +712,7 @@ export default function HomePage() {
               <button
                 type="button"
                 style={{ animationDelay: `${menuItems.length * 60}ms` }}
-                className="auth-field auth-btn rounded-lg border border-amber-400/20 bg-slate-950/20 px-3 py-2 text-left font-semibold text-slate-300 transition hover:border-amber-400/50 hover:text-amber-100"
+                className="auth-field auth-btn col-start-1 row-start-2 rounded-lg border border-amber-400/20 bg-slate-950/20 px-3 py-2 text-left font-semibold text-slate-300 transition hover:border-amber-400/50 hover:text-amber-100"
                 onClick={() => {
                   setIsBalanceHistoryOpen(true);
                   setIsMobileMenuOpen(false);
