@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { hasPasswordDiacritics } from "@/lib/password-validation";
 import BalanceHistoryModal from "./components/BalanceHistoryModal";
 import GameCenter from "./components/GameCenter";
+import HorseRacingGame from "./components/HorseRacingGame";
 
 const menuItems = ["Ví", "Khuyến mãi", "Hỗ trợ"];
 let simulationDisclaimerDismissed = false;
@@ -664,6 +665,21 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => {
+                  setActiveMenu("Đua Ngựa");
+                  setIsMobileMenuOpen(false);
+                }}
+                aria-label="Đua Ngựa"
+                title="Đua Ngựa"
+                className={`rounded-xl border p-2.5 transition ${activeMenu === "Đua Ngựa" ? "border-amber-400/50 bg-amber-500/20 text-amber-100" : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"}`}
+              >
+                <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m4 11 2-5 3 2 4-1 2-4 4 4-2 4 2 3-1 6h-3l.5-4H9l.5 4H7c.4-2.2.1-4.4-1.2-6.2L4 11Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 8h.01M14 7l2 1" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setActiveMenu("Sòng bạc");
                   setIsMobileMenuOpen(false);
                 }}
@@ -727,6 +743,8 @@ export default function HomePage() {
         <section className="mx-auto w-full max-w-[1440px] px-6 py-10">
           {walletLoading ? (
             <div className="rounded-3xl border border-white/10 bg-slate-900/80 p-8 text-slate-300">Đang tải số dư...</div>
+          ) : activeMenu === "Đua Ngựa" ? (
+            <HorseRacingGame wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
           ) : activeMenu === "Sòng bạc" ? (
             <GameCenter wallet={wallet} onWalletUpdate={handleGameWalletUpdate} />
           ) : activeMenu === "Thông báo" ? (

@@ -1,6 +1,13 @@
 import crypto from "crypto";
 import { sql } from "@vercel/postgres";
 import { initializeDatabase } from "@/lib/initdb";
+import {
+  drawHorseRaceOrder,
+  getHorsePerformanceScores,
+  horseBetTypes,
+  type HorseBetType,
+  type HorseRaceCard,
+} from "@/lib/horse-racing";
 
 async function ensureDatabaseReady() {
   try {
@@ -502,6 +509,84 @@ export async function updateWallet(userId: string, wallet: StoredWallet): Promis
     RETURNING balance, debt, win_streak, loss_streak, daily_claim_date, newbie_step, newbie_daily_claim_date, created_at
   `;
   return mapWallet(result.rows[0] as WalletRow);
+}
+
+export async function resolveHorseRaceBet(
+  userId: string,
+  amount: number,
+  betType: HorseBetType,
+  horseNumber: number,
+  race: HorseRaceCard,
+): Promise<{
+  wallet: { balance: number; debt: number };
+  won: boolean;
+  finishPosition: number;
+  finishOrder: number[];
+  odds: number;
+  totalReturn: number;
+  netProfit: number;
+}> {
+  await ensureDatabaseReady();
+  const horseIndex = horseNumber - 1;
+  const odds = race.odds[betType][horseIndex];
+  const places = horseBetTypes.find((type) => type.value === betType)?.places;
+  if (!Number.isSafeInteger(amount) || amount <= 0 ||
+      !Number.isInteger(horseIndex) || horseIndex < 0 || horseIndex >= race.horses.length ||
+      typeof places !== "number" || !Number.isFinite(odds) || odds < 1) {
+    throw new Error("INVALID_HORSE_RACE_BET");
+  }
+
+  const scores = getHorsePerformanceScores(race.condition, race.distance);
+  const finishOrder = drawHorseRaceOrder(scores, () => crypto.randomInt(0, 2 ** 32) / 2 ** 32)
+    .map((index) => index + 1);
+  const finishPosition = finishOrder.indexOf(horseNumber) + 1;
+  const won = finishPosition <= places;
+  const totalReturn = won ? Math.floor(amount * odds) : 0;
+  if (!Number.isSafeInteger(totalReturn)) throw new Error("INVALID_HORSE_RACE_BET");
+  const netProfit = totalReturn - amount;
+  const balanceDelta = netProfit;
+  const result = await sql`
+    WITH wallet_update AS (
+      UPDATE user_wallets
+      SET balance = balance + ${balanceDelta},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ${userId}
+        AND balance >= ${amount}
+        AND balance + ${balanceDelta} >= 0
+      RETURNING balance, debt
+    ),
+    recorded_race AS (
+      INSERT INTO horse_race_rounds (
+        id, user_id, race_date, race_number, track_name, track_condition, distance,
+        bet_type, horse_number, amount, odds, finish_position, finish_order,
+        total_return, net_profit
+      )
+      SELECT
+        ${crypto.randomUUID()}, ${userId}, ${race.raceDate}::date, ${race.raceNumber},
+        ${race.trackName}, ${race.condition}, ${race.distance}, ${betType}, ${horseNumber},
+        ${amount}, ${odds}, ${finishPosition}, ${JSON.stringify(finishOrder)}::jsonb,
+        ${totalReturn}, ${netProfit}
+      FROM wallet_update
+      RETURNING id
+    )
+    SELECT wallet_update.balance, wallet_update.debt
+    FROM wallet_update
+    CROSS JOIN recorded_race
+  `;
+  if (!result.rows.length) throw new Error("INVALID_HORSE_RACE_BET");
+
+  return {
+    wallet: {
+      balance: Number(result.rows[0].balance),
+      debt: Number(result.rows[0].debt),
+    },
+    won,
+    finishPosition,
+    finishOrder,
+    odds,
+    totalReturn,
+    netProfit,
+  };
 }
 
 export async function claimDailyWallet(userId: string, dateKey: string): Promise<StoredWallet | null> {

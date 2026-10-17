@@ -121,6 +121,21 @@
   animation: authFieldIn 0.35s ease-out both;
 }
 
+.horse-race-running {
+  animation-name: horseRaceRun;
+  animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes horseRaceRun {
+  from {
+    left: 0;
+  }
+  to {
+    left: calc(100% - 4rem);
+  }
+}
+
 .auth-field:nth-child(2) {
   animation-delay: 0.06s;
 }
