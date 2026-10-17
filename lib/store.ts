@@ -519,6 +519,7 @@ export async function prepareHorseRaceBet(
   race: HorseRaceCard,
 ): Promise<{
   pendingId: string;
+  amount: number;
   wallet: { balance: number; debt: number };
   won: boolean;
   finishPosition: number;
@@ -596,6 +597,7 @@ export async function prepareHorseRaceBet(
 
   return {
     pendingId,
+    amount,
     wallet: {
       balance: Number(result.rows[0].balance),
       debt: Number(result.rows[0].debt),

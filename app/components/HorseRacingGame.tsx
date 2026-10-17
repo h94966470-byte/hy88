@@ -18,6 +18,7 @@ type Wallet = {
 
 type RaceOutcome = {
   wallet: Wallet;
+  amount: number;
   won: boolean;
   finishPosition: number;
   finishOrder: number[];
@@ -116,6 +117,8 @@ export default function HorseRacingGame({
     : null;
   const selectedBetLabel = horseBetTypes.find((item) => item.value === betType)?.label;
   const betControlsDisabled = submitting || raceRunning || Boolean(pendingRace);
+  const displayedBetAmount = pendingRace?.amount ?? outcome?.amount ??
+    (validAmount ? selectedAmount : null);
 
   const selectBetMode = (mode: BetMode) => {
     setBetMode(mode);
@@ -164,6 +167,7 @@ export default function HorseRacingGame({
 
     setOutcome({
       wallet: data.wallet,
+      amount: preparedRace.amount,
       won: data.won,
       finishPosition: data.finishPosition,
       finishOrder: data.finishOrder,
@@ -358,15 +362,21 @@ export default function HorseRacingGame({
       </section>
 
       <section className="rounded-3xl border border-emerald-400/20 bg-slate-900/80 p-5 shadow-2xl sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+        <div className="grid items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+          <div className="min-w-0">
             <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Vòng đua 5 làn</p>
             <h2 className="mt-1 text-xl font-bold text-white">
               {race ? `Cuộc đua #${race.raceNumber} · ${race.trackName}` : "Đang chuẩn bị trường đua"}
             </h2>
           </div>
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-amber-200">Tiền vào cược</p>
+            <p className="mt-1 font-bold tabular-nums text-white">
+              {displayedBetAmount === null ? "—" : formatMoney(displayedBetAmount)}
+            </p>
+          </div>
           {race && (
-            <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-sm text-amber-100">
+            <span className="justify-self-start rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-sm text-amber-100 sm:justify-self-end">
               Mặt sân: {trackConditionLabels[race.condition]}
             </span>
           )}
