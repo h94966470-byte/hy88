@@ -178,9 +178,6 @@ export default function HorseRacingGame({
       window.requestAnimationFrame(animate);
     });
     setSubmitting(false);
-    setMessage(data.won
-      ? `Bạn thắng! Nhận ${formatMoney(data.totalReturn)} (lãi ${formatMoney(data.netProfit)}).`
-      : `Ngựa về vị trí ${data.finishPosition}. Bạn thua ${formatMoney(selectedAmount)}.`);
     try {
       await onWalletUpdate(data.wallet.balance, data.wallet.debt);
     } catch (error) {
@@ -375,7 +372,7 @@ export default function HorseRacingGame({
         >
           {submitting ? "Đang xác nhận cược..." : raceRunning ? "Đang đua..." : "Xác nhận cược"}
         </button>
-        {message && <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100" aria-live="polite">{message}</p>}
+        {message && !outcome && <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100" aria-live="polite">{message}</p>}
       </section>
     </div>
   );

@@ -188,13 +188,16 @@ export function drawHorseRaceOrderForBet(
   places: number,
   shouldWin: boolean,
   random: () => number,
+  exactPosition?: number,
 ): number[] {
   const candidates: Array<{ order: number[]; probability: number }> = [];
 
   const visit = (remaining: number[], order: number[], probability: number) => {
     if (!remaining.length) {
       const selectedPosition = order.indexOf(selectedHorseIndex);
-      if ((selectedPosition < places) === shouldWin) {
+      const matchesOutcome = (selectedPosition < places) === shouldWin;
+      const matchesExactPosition = exactPosition === undefined || selectedPosition === exactPosition;
+      if (matchesOutcome && matchesExactPosition) {
         candidates.push({ order, probability });
       }
       return;

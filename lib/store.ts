@@ -552,6 +552,7 @@ export async function resolveHorseRaceBet(
     places,
     shouldWin,
     () => crypto.randomInt(0, 2 ** 32) / 2 ** 32,
+    customRate === 1 ? places - 1 : undefined,
   );
   const finishPosition = finishOrder.indexOf(horseNumber) + 1;
   const won = finishPosition <= places;
