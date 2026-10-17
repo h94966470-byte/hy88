@@ -12,6 +12,8 @@ type GameResult = {
   profit: number;
 };
 
+type BetMode = "custom" | "half" | "all";
+
 interface TaiXiuGameProps {
   wallet: {
     balance: number;
@@ -24,21 +26,37 @@ interface TaiXiuGameProps {
 }
 
 export default function TaiXiuGame({ wallet, onWalletUpdate }: TaiXiuGameProps) {
-  const [betAmount, setBetAmount] = useState("");
+  const [betMode, setBetMode] = useState<BetMode>("custom");
+  const [customAmount, setCustomAmount] = useState("");
   const [playing, setPlaying] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [gameResult, setGameResult] = useState<GameResult | null>(null);
   const [message, setMessage] = useState("");
 
+  const selectedAmount = betMode === "all"
+    ? wallet?.balance ?? 0
+    : betMode === "half"
+      ? Math.floor((wallet?.balance ?? 0) / 2)
+      : Number(customAmount);
+  const validAmount = Number.isSafeInteger(selectedAmount) &&
+    selectedAmount > 0 &&
+    selectedAmount <= (wallet?.balance ?? 0);
+
+  const selectBetMode = (mode: BetMode) => {
+    setBetMode(mode);
+    setMessage("");
+  };
+
   const rollDice = async (choice: "tai" | "xiu") => {
     if (!wallet) return;
 
-    const amount = Number(betAmount);
-    if (!betAmount || amount <= 0 || amount > wallet.balance) {
+    if (!validAmount) {
       setMessage("Nhập số tiền cược hợp lệ");
       return;
     }
 
+    const amount = selectedAmount;
+    setPlaying(true);
     setRolling(true);
     setMessage("");
 
@@ -89,36 +107,51 @@ export default function TaiXiuGame({ wallet, onWalletUpdate }: TaiXiuGameProps) 
 
       {!playing && !gameResult ? (
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-slate-300 mb-2">Nhập tiền cược (VND)</label>
-            <input
-              type="number"
-              value={betAmount}
-              onChange={(e) => setBetAmount(e.target.value)}
-              placeholder="Ví dụ: 10000"
-              className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none"
-            />
-          </div>
+          <section className="space-y-4 rounded-2xl border border-white/10 bg-slate-900/50 p-4 sm:p-6">
+            <h2 className="text-lg font-bold text-white">Chọn số tiền cược</h2>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <AmountButton selected={betMode === "custom"} label="Tùy chỉnh" detail="Nhập số tiền" onClick={() => selectBetMode("custom")} />
+              <AmountButton selected={betMode === "half"} label="50% số dư" detail={`${Math.floor(wallet.balance / 2).toLocaleString("vi-VN")} VND`} onClick={() => selectBetMode("half")} />
+              <AmountButton selected={betMode === "all"} label="Tất cả số dư" detail={`${wallet.balance.toLocaleString("vi-VN")} VND`} onClick={() => selectBetMode("all")} />
+            </div>
+            <label className="block text-sm font-semibold text-slate-200">
+              Số tiền (VND)
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={betMode === "custom" ? customAmount : selectedAmount || ""}
+                onChange={(event) => {
+                  setBetMode("custom");
+                  setCustomAmount(event.target.value);
+                  setMessage("");
+                }}
+                disabled={betMode !== "custom"}
+                placeholder="Ví dụ: 10.000"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-400/60 disabled:opacity-60"
+              />
+            </label>
+            {!validAmount && (betMode !== "custom" || customAmount !== "") && (
+              <p className="text-sm text-red-300" aria-live="polite">
+                {selectedAmount > wallet.balance ? "Số dư không đủ cho mức cược này." : "Nhập số tiền cược nguyên dương."}
+              </p>
+            )}
+          </section>
 
           <div className="grid gap-3 md:grid-cols-2">
             <button
               type="button"
-              onClick={() => {
-                setPlaying(true);
-                rollDice("tai");
-              }}
-              disabled={rolling || !betAmount}
+              onClick={() => rollDice("tai")}
+              disabled={rolling || !validAmount}
               className="rounded-2xl border border-red-400/40 bg-red-500/10 px-6 py-4 font-bold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
             >
               🔴 TÀI (&gt;10)
             </button>
             <button
               type="button"
-              onClick={() => {
-                setPlaying(true);
-                rollDice("xiu");
-              }}
-              disabled={rolling || !betAmount}
+              onClick={() => rollDice("xiu")}
+              disabled={rolling || !validAmount}
               className="rounded-2xl border border-blue-400/40 bg-blue-500/10 px-6 py-4 font-bold text-blue-200 transition hover:bg-blue-500/20 disabled:opacity-50"
             >
               🔵 XỈU (&lt;11)
@@ -166,7 +199,8 @@ export default function TaiXiuGame({ wallet, onWalletUpdate }: TaiXiuGameProps) 
             onClick={() => {
               setGameResult(null);
               setPlaying(false);
-              setBetAmount("");
+              setBetMode("custom");
+              setCustomAmount("");
               setMessage("");
             }}
             className="w-full rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-3 font-semibold text-amber-200 transition hover:bg-amber-500/20"
@@ -182,5 +216,33 @@ export default function TaiXiuGame({ wallet, onWalletUpdate }: TaiXiuGameProps) 
         </p>
       )}
     </div>
+  );
+}
+
+function AmountButton({
+  selected,
+  label,
+  detail,
+  onClick,
+}: {
+  selected: boolean;
+  label: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`rounded-xl border p-3 text-left transition ${
+        selected
+          ? "border-amber-300/70 bg-amber-500/15 text-amber-100 ring-1 ring-amber-300/30"
+          : "border-white/10 bg-slate-950/40 text-slate-200 hover:border-amber-400/40"
+      }`}
+    >
+      <span className="block font-bold">{label}</span>
+      <span className="mt-1 block text-xs text-slate-400">{detail}</span>
+    </button>
   );
 }
