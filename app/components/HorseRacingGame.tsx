@@ -62,6 +62,7 @@ export default function HorseRacingGame({
   const [selectedHorse, setSelectedHorse] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [raceRunning, setRaceRunning] = useState(false);
+  const [raceProgress, setRaceProgress] = useState(0);
   const [outcome, setOutcome] = useState<RaceOutcome | null>(null);
   const [message, setMessage] = useState("");
 
@@ -130,6 +131,7 @@ export default function HorseRacingGame({
     setSubmitting(true);
     setMessage("");
     setOutcome(null);
+    setRaceProgress(0);
 
     let response: Response;
     let data: RaceOutcome & { error?: string };
@@ -161,8 +163,20 @@ export default function HorseRacingGame({
     setRace(data.race);
     setOutcome(data);
     setRaceRunning(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 4200));
-    setRaceRunning(false);
+    await new Promise<void>((resolve) => {
+      const startedAt = performance.now();
+      const animate = (now: number) => {
+        const progress = Math.min((now - startedAt) / 15000, 1);
+        setRaceProgress(progress);
+        if (progress === 1) {
+          setRaceRunning(false);
+          resolve();
+        } else {
+          window.requestAnimationFrame(animate);
+        }
+      };
+      window.requestAnimationFrame(animate);
+    });
     setSubmitting(false);
     setMessage(data.won
       ? `Bạn thắng! Nhận ${formatMoney(data.totalReturn)} (lãi ${formatMoney(data.netProfit)}).`
@@ -184,9 +198,9 @@ export default function HorseRacingGame({
             <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">Đua Ngựa</h1>
             <p className="mt-2 text-sm text-slate-300">Chọn cuộc đua, kiểu cược và ngựa dự đoán. Kết quả được xác định ở máy chủ.</p>
           </div>
-          <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-right">
-            <p className="text-xs uppercase tracking-wider text-emerald-200">Số dư</p>
-            <p className="mt-1 font-bold tabular-nums text-white">{formatMoney(wallet.balance)}</p>
+          <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-right">
+            <p className="text-xs uppercase tracking-wider text-red-200">Số nợ</p>
+            <p className="mt-1 font-bold tabular-nums text-white">{formatMoney(wallet.debt)}</p>
           </div>
         </div>
       </section>
@@ -300,7 +314,7 @@ export default function HorseRacingGame({
       <section className="rounded-3xl border border-emerald-400/20 bg-slate-900/80 p-5 shadow-2xl sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Đường đua 5 làn</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Vòng đua 5 làn</p>
             <h2 className="mt-1 text-xl font-bold text-white">
               {race ? `Cuộc đua #${race.raceNumber} · ${race.trackName}` : "Đang chuẩn bị trường đua"}
             </h2>
@@ -312,20 +326,18 @@ export default function HorseRacingGame({
           )}
         </div>
 
-        <div className="mt-5 space-y-2" aria-label="Đường đua gồm 5 làn">
-          {race?.horses.map((horse) => (
-            <RaceLane
-              key={horse.number}
-              horse={horse}
-              position={outcome?.finishOrder.indexOf(horse.number) ?? -1}
-              running={raceRunning}
-            />
-          ))}
-        </div>
+        {race && (
+          <OvalRaceTrack
+            race={race}
+            progress={raceProgress}
+            finishOrder={outcome?.finishOrder ?? null}
+            running={raceRunning}
+          />
+        )}
 
         {raceRunning && (
           <p className="mt-4 animate-pulse text-center text-lg font-bold text-amber-200" aria-live="polite">
-            Cuộc đua đang diễn ra...
+            Cuộc đua đang diễn ra... {Math.max(0, 15 - Math.floor(raceProgress * 15))} giây
           </p>
         )}
 
@@ -462,34 +474,160 @@ function HorseFormCard({
   );
 }
 
-function RaceLane({
-  horse,
-  position,
+function getHorseProgress(progress: number, rank: number, horseNumber: number) {
+  const targetProgress = 1.006 + ((5 - rank) / 4) * 0.02;
+  const preFinishProgress =
+    progress * 0.86 +
+    Math.sin((progress * 2.4 + horseNumber * 0.31) * Math.PI * 2) *
+      0.09 * Math.sin(progress * Math.PI) +
+    Math.sin((progress * 5.3 + horseNumber * 0.73) * Math.PI * 2) *
+      0.025 * Math.sin(progress * Math.PI);
+  const settleProgress = Math.max(0, Math.min((progress - 0.65) / 0.35, 1));
+  const settle = settleProgress * settleProgress * (3 - 2 * settleProgress);
+  return preFinishProgress * (1 - settle) + targetProgress * settle;
+}
+
+function OvalRaceTrack({
+  race,
+  progress,
+  finishOrder,
   running,
 }: {
-  horse: RacingHorse;
-  position: number;
+  race: HorseRaceCard;
+  progress: number;
+  finishOrder: number[] | null;
   running: boolean;
 }) {
-  const raceDuration = position >= 0 ? 2.4 + position * 0.35 : 3.8;
+  const laneRadii = race.horses.map((_, index) => ({
+    x: 310 - index * 34,
+    y: 166 - index * 18,
+  }));
 
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="w-8 shrink-0 text-center text-xs font-black text-amber-200">#{horse.number}</span>
-      <div className="relative h-12 min-w-0 flex-1 overflow-hidden rounded-lg border border-white/10 bg-[repeating-linear-gradient(0deg,#173b2d_0px,#173b2d_11px,#1a4634_12px,#1a4634_23px)]">
-        <span className="absolute inset-y-0 right-5 z-10 border-l-2 border-dashed border-white/70" aria-hidden="true" />
-        <div
-          className={`horse-race-runner absolute inset-y-0 left-0 z-20 flex w-16 items-center justify-center ${running ? "horse-race-running" : ""}`}
-          style={running ? { animationDuration: `${raceDuration}s` } : undefined}
-        >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-black text-slate-950 shadow-lg" style={{ backgroundColor: horse.color }}>
-            {horse.number}
+    <div className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-slate-950/70 p-2 sm:p-5">
+      <svg
+        viewBox="0 0 800 440"
+        role="img"
+        aria-label="Đường đua hình oval gồm năm làn đồng tâm"
+        className="mx-auto block w-full max-w-4xl"
+      >
+        <defs>
+          <linearGradient id="race-track-grass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#163c2e" />
+            <stop offset="100%" stopColor="#0d291f" />
+          </linearGradient>
+          <filter id="race-horse-shadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000" floodOpacity="0.65" />
+          </filter>
+        </defs>
+
+        <rect x="0" y="0" width="800" height="440" rx="26" fill="#090f0c" />
+        <ellipse cx="400" cy="220" rx="332" ry="190" fill="#0b1b14" stroke="#b68a36" strokeWidth="3" />
+        {laneRadii.map((radii, index) => (
+          <g key={index}>
+            <ellipse
+              cx="400"
+              cy="220"
+              rx={radii.x}
+              ry={radii.y}
+              fill="none"
+              stroke="url(#race-track-grass)"
+              strokeWidth="31"
+            />
+            <ellipse
+              cx="400"
+              cy="220"
+              rx={radii.x}
+              ry={radii.y}
+              fill="none"
+              stroke="#a6c4a9"
+              strokeOpacity="0.28"
+              strokeWidth="1"
+              strokeDasharray="7 9"
+            />
+          </g>
+        ))}
+
+        <ellipse cx="400" cy="220" rx="122" ry="74" fill="#101812" stroke="#c9a44d" strokeOpacity="0.6" strokeWidth="2" />
+        <text x="400" y="211" textAnchor="middle" fill="#fbbf24" fontSize="14" fontWeight="800" letterSpacing="3">
+          HY88
+        </text>
+        <text x="400" y="235" textAnchor="middle" fill="#cbd5c0" fontSize="11" fontWeight="700">
+          {race.trackName.toUpperCase()}
+        </text>
+
+        {laneRadii.map((radii, index) => (
+          <g key={`finish-${index}`}>
+            <line
+              x1="400"
+              y1={220 - radii.y - 16}
+              x2="400"
+              y2={220 - radii.y + 16}
+              stroke={index % 2 === 0 ? "#fff" : "#111"}
+              strokeWidth="5"
+            />
+            <text
+              x={400 + radii.x + 6}
+              y="224"
+              fill="#fde68a"
+              fontSize="12"
+              fontWeight="800"
+            >
+              {index + 1}
+            </text>
+          </g>
+        ))}
+
+        <text x="400" y="35" textAnchor="middle" fill="#fef3c7" fontSize="11" fontWeight="800" letterSpacing="2">
+          VẠCH ĐÍCH
+        </text>
+
+        {race.horses.map((horse, index) => {
+          const rank = finishOrder
+            ? finishOrder.indexOf(horse.number) + 1
+            : index + 1;
+          const horseProgress = running && finishOrder
+            ? getHorseProgress(progress, rank, horse.number)
+            : finishOrder && progress >= 1
+              ? 1.006 + ((5 - rank) / 4) * 0.02
+              : 0;
+          const angle = -Math.PI / 2 + horseProgress * Math.PI * 2;
+          const radii = laneRadii[index];
+          const x = 400 + radii.x * Math.cos(angle);
+          const y = 220 + radii.y * Math.sin(angle);
+
+          return (
+            <g
+              key={horse.number}
+              transform={`translate(${x} ${y})`}
+              filter="url(#race-horse-shadow)"
+            >
+              <circle r="17" fill={horse.color} stroke="#fff" strokeOpacity="0.75" strokeWidth="2" />
+              <text
+                y="5"
+                textAnchor="middle"
+                fill="#111827"
+                fontSize="14"
+                fontWeight="900"
+              >
+                {horse.number}
+              </text>
+              <text x="20" y="5" fontSize="21" textAnchor="middle" aria-hidden="true">🏇</text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-300">
+        {race.horses.map((horse) => (
+          <span key={horse.number} className="inline-flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: horse.color }} />
+            #{horse.number} {horse.name}
+            {finishOrder && !running && progress >= 1 && (
+              <span className="font-bold text-amber-200">· Hạng {finishOrder.indexOf(horse.number) + 1}</span>
+            )}
           </span>
-          <span className="ml-0.5 text-2xl drop-shadow" aria-hidden="true">🏇</span>
-        </div>
-        <span className="absolute right-6 top-1/2 z-0 -translate-y-1/2 text-[9px] font-black uppercase text-white/70">Đích</span>
+        ))}
       </div>
-      <span className="w-12 shrink-0 truncate text-right text-[10px] font-semibold text-slate-300 sm:w-20 sm:text-xs">{horse.name}</span>
     </div>
   );
 }
