@@ -128,6 +128,11 @@ export default function HorseRacingGame({
 
   const confirmBet = async () => {
     if (!race || !selectedHorse || !validAmount || raceRunning || submitting) return;
+    if (outcome) {
+      setOutcome(null);
+      setRaceProgress(0);
+      setMessage("");
+    }
     setSubmitting(true);
     setMessage("");
     setOutcome(null);
@@ -370,7 +375,7 @@ export default function HorseRacingGame({
           disabled={!race || raceLoading || !validAmount || !selectedHorse || submitting || raceRunning}
           className="mt-5 w-full rounded-xl border border-amber-300/50 bg-amber-500/20 px-5 py-4 text-lg font-black text-amber-100 transition hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Đang xác nhận cược..." : raceRunning ? "Đang đua..." : "Xác nhận cược"}
+          {submitting ? "Đang xác nhận cược..." : raceRunning ? "Đang đua..." : outcome ? "Chơi lại" : "Xác nhận cược"}
         </button>
         {message && !outcome && <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100" aria-live="polite">{message}</p>}
       </section>
