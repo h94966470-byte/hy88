@@ -615,7 +615,7 @@ export default function HomePage() {
         <main className="min-h-screen bg-slate-950 text-white">
         <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-900/95 backdrop-blur-xl">
           <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 px-3 py-2 sm:grid-cols-[minmax(0,1fr)_minmax(180px,1fr)_auto] sm:px-6">
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="col-span-2 flex min-w-0 items-center gap-2 sm:col-span-1">
               <button
                 type="button"
                 className="shrink-0 text-lg font-bold text-amber-400 sm:text-xl"
@@ -628,13 +628,13 @@ export default function HomePage() {
               </span>
             </div>
 
-            <div className="col-span-2 row-start-2 flex min-h-10 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:min-h-11">
+            <div className="col-start-1 row-start-2 flex min-h-10 w-[calc(100%-3rem)] min-w-0 items-center justify-center rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-3 py-1 sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:min-h-11 sm:w-full">
               <span className="truncate text-sm font-bold tabular-nums text-emerald-200 sm:text-base">
                 {wallet ? animatedBalance.toLocaleString("vi-VN") : "—"} VND
               </span>
             </div>
 
-            <div className="col-start-2 row-start-1 flex items-center justify-end gap-1.5 sm:col-start-3 sm:row-start-1 sm:gap-3">
+            <div className="col-start-2 row-start-2 flex items-center justify-end gap-1.5 sm:col-start-3 sm:row-start-1 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setIsMobileMenuOpen((open) => !open)}
@@ -693,7 +693,7 @@ export default function HomePage() {
             <nav
               id="mobile-navigation"
               aria-label="Điều hướng chính"
-              className={`${isMobileMenuOpen ? "grid" : "hidden"} w-full grid-cols-2 gap-1 border-t border-white/10 pt-3 text-sm text-slate-300`}
+              className={`${isMobileMenuOpen ? "grid" : "hidden"} col-span-2 w-full grid-cols-2 gap-1 border-t border-white/10 pt-3 text-sm text-slate-300 sm:col-span-3`}
             >
               {menuItems.map((item, index) => (
                 <button
