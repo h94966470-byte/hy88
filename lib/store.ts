@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { sql } from "@vercel/postgres";
 import { initializeDatabase } from "@/lib/initdb";
 import {
-  drawHorseRaceOrder,
+  drawHorseRaceOrderForBet,
   getHorsePerformanceScores,
   horseBetTypes,
   type HorseBetType,
@@ -527,18 +527,32 @@ export async function resolveHorseRaceBet(
   netProfit: number;
 }> {
   await ensureDatabaseReady();
+  const wallet = await getOrCreateWallet(userId);
   const horseIndex = horseNumber - 1;
   const odds = race.odds[betType][horseIndex];
   const places = horseBetTypes.find((type) => type.value === betType)?.places;
   if (!Number.isSafeInteger(amount) || amount <= 0 ||
       !Number.isInteger(horseIndex) || horseIndex < 0 || horseIndex >= race.horses.length ||
-      typeof places !== "number" || !Number.isFinite(odds) || odds < 1) {
+      typeof places !== "number" || !Number.isFinite(odds) || odds < 1 ||
+      amount > wallet.balance) {
     throw new Error("INVALID_HORSE_RACE_BET");
   }
 
+  const { customRate } = await getAppSettings();
+  const winRate = getFinalWinRate(customRate, wallet.balance, wallet.winStreak, wallet.lossStreak);
+  const shouldWin = customRate === 0
+    ? false
+    : customRate === 1
+      ? true
+      : crypto.randomInt(0, 10000) < Math.floor(winRate * 10000);
   const scores = getHorsePerformanceScores(race.condition, race.distance);
-  const finishOrder = drawHorseRaceOrder(scores, () => crypto.randomInt(0, 2 ** 32) / 2 ** 32)
-    .map((index) => index + 1);
+  const finishOrder = drawHorseRaceOrderForBet(
+    scores,
+    horseIndex,
+    places,
+    shouldWin,
+    () => crypto.randomInt(0, 2 ** 32) / 2 ** 32,
+  );
   const finishPosition = finishOrder.indexOf(horseNumber) + 1;
   const won = finishPosition <= places;
   const totalReturn = won ? Math.floor(amount * odds) : 0;
@@ -549,9 +563,14 @@ export async function resolveHorseRaceBet(
     WITH wallet_update AS (
       UPDATE user_wallets
       SET balance = balance + ${balanceDelta},
+          win_streak = ${won ? wallet.winStreak + 1 : 0},
+          loss_streak = ${won ? 0 : wallet.lossStreak + 1},
           updated_at = CURRENT_TIMESTAMP
       WHERE user_id = ${userId}
         AND balance >= ${amount}
+        AND balance = ${wallet.balance}
+        AND win_streak = ${wallet.winStreak}
+        AND loss_streak = ${wallet.lossStreak}
         AND balance + ${balanceDelta} >= 0
       RETURNING balance, debt
     ),

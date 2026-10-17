@@ -181,3 +181,44 @@ export function drawHorseRaceOrder(scores: number[], random: () => number): numb
 
   return order;
 }
+
+export function drawHorseRaceOrderForBet(
+  scores: number[],
+  selectedHorseIndex: number,
+  places: number,
+  shouldWin: boolean,
+  random: () => number,
+): number[] {
+  const candidates: Array<{ order: number[]; probability: number }> = [];
+
+  const visit = (remaining: number[], order: number[], probability: number) => {
+    if (!remaining.length) {
+      const selectedPosition = order.indexOf(selectedHorseIndex);
+      if ((selectedPosition < places) === shouldWin) {
+        candidates.push({ order, probability });
+      }
+      return;
+    }
+
+    const totalScore = remaining.reduce((total, index) => total + scores[index], 0);
+    for (const horseIndex of remaining) {
+      visit(
+        remaining.filter((index) => index !== horseIndex),
+        [...order, horseIndex],
+        probability * scores[horseIndex] / totalScore,
+      );
+    }
+  };
+
+  visit(scores.map((_, index) => index), [], 1);
+  const totalProbability = candidates.reduce((total, candidate) => total + candidate.probability, 0);
+  if (totalProbability <= 0) throw new Error("INVALID_HORSE_RACE_OUTCOME");
+
+  let choice = random() * totalProbability;
+  for (const candidate of candidates) {
+    choice -= candidate.probability;
+    if (choice < 0) return candidate.order.map((index) => index + 1);
+  }
+
+  return candidates[candidates.length - 1].order.map((index) => index + 1);
+}
