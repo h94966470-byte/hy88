@@ -275,6 +275,35 @@ export async function initializeDatabase() {
       ON horse_race_rounds(user_id, created_at DESC);
     `;
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS pending_horse_races (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        race_date DATE NOT NULL,
+        race_number SMALLINT NOT NULL CHECK (race_number BETWEEN 1 AND 5),
+        track_name VARCHAR(100) NOT NULL,
+        track_condition VARCHAR(20) NOT NULL,
+        distance VARCHAR(20) NOT NULL,
+        bet_type VARCHAR(10) NOT NULL CHECK (bet_type IN ('win', 'place', 'show')),
+        horse_number SMALLINT NOT NULL CHECK (horse_number BETWEEN 1 AND 5),
+        amount BIGINT NOT NULL CHECK (amount > 0),
+        odds NUMERIC(8, 2) NOT NULL,
+        won BOOLEAN NOT NULL,
+        finish_position SMALLINT NOT NULL CHECK (finish_position BETWEEN 1 AND 5),
+        finish_order JSONB NOT NULL,
+        total_return BIGINT NOT NULL,
+        net_profit BIGINT NOT NULL,
+        settled_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_pending_horse_races_user
+      ON pending_horse_races(user_id, created_at DESC)
+      WHERE settled_at IS NULL;
+    `;
+
     console.log("✅ Database initialized successfully");
   } catch (error) {
     console.error("❌ Database initialization error:", error);

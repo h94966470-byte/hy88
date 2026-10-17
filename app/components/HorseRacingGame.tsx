@@ -27,6 +27,10 @@ type RaceOutcome = {
   race: HorseRaceCard;
 };
 
+type PreparedRace = Omit<RaceOutcome, "wallet"> & {
+  pendingId: string;
+};
+
 type BetMode = "custom" | "half" | "all";
 
 const raceNumbers = [1, 2, 3, 4, 5];
@@ -63,6 +67,7 @@ export default function HorseRacingGame({
   const [submitting, setSubmitting] = useState(false);
   const [raceRunning, setRaceRunning] = useState(false);
   const [raceProgress, setRaceProgress] = useState(0);
+  const [pendingRace, setPendingRace] = useState<PreparedRace | null>(null);
   const [outcome, setOutcome] = useState<RaceOutcome | null>(null);
   const [message, setMessage] = useState("");
 
@@ -110,6 +115,7 @@ export default function HorseRacingGame({
     ? Math.floor(selectedAmount * selectedOdds)
     : null;
   const selectedBetLabel = horseBetTypes.find((item) => item.value === betType)?.label;
+  const betControlsDisabled = submitting || raceRunning || Boolean(pendingRace);
 
   const selectBetMode = (mode: BetMode) => {
     setBetMode(mode);
@@ -126,6 +132,52 @@ export default function HorseRacingGame({
     setMessage("");
   };
 
+  const settlePendingRace = async (preparedRace: PreparedRace) => {
+    setSubmitting(true);
+    setMessage("");
+    let response: Response;
+    let data: Partial<RaceOutcome> & { error?: string };
+    try {
+      response = await fetch("/api/horse-racing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "settle", pendingId: preparedRace.pendingId }),
+      });
+      data = await response.json() as typeof data;
+    } catch (error) {
+      console.error("Settle horse racing bet error:", error);
+      setMessage("Cuộc đua đã kết thúc nhưng chưa thể chốt kết quả. Bấm “Hoàn tất cuộc đua” để thử lại.");
+      setRaceRunning(false);
+      setSubmitting(false);
+      return;
+    }
+
+    if (!response.ok || !data.wallet || typeof data.won !== "boolean" ||
+        !data.finishOrder || typeof data.finishPosition !== "number" ||
+        typeof data.odds !== "number" || typeof data.totalReturn !== "number" ||
+        typeof data.netProfit !== "number") {
+      setMessage(data.error || "Cuộc đua đã kết thúc nhưng chưa thể chốt kết quả. Bấm “Hoàn tất cuộc đua” để thử lại.");
+      setRaceRunning(false);
+      setSubmitting(false);
+      return;
+    }
+
+    setOutcome({
+      wallet: data.wallet,
+      won: data.won,
+      finishPosition: data.finishPosition,
+      finishOrder: data.finishOrder,
+      odds: data.odds,
+      totalReturn: data.totalReturn,
+      netProfit: data.netProfit,
+      race: preparedRace.race,
+    });
+    setPendingRace(null);
+    setRaceRunning(false);
+    setSubmitting(false);
+    await onWalletUpdate(data.wallet.balance, data.wallet.debt);
+  };
+
   const confirmBet = async () => {
     if (!race || !selectedHorse || !validAmount || raceRunning || submitting) return;
     setSubmitting(true);
@@ -134,19 +186,20 @@ export default function HorseRacingGame({
     setRaceProgress(0);
 
     let response: Response;
-    let data: RaceOutcome & { error?: string };
+    let data: PreparedRace & { wallet?: Wallet; error?: string };
     try {
       response = await fetch("/api/horse-racing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "prepare",
           raceNumber,
           amount: selectedAmount,
           betType,
           horseNumber: selectedHorse,
         }),
       });
-      data = await response.json() as RaceOutcome & { error?: string };
+      data = await response.json() as typeof data;
     } catch (error) {
       console.error("Place horse racing bet error:", error);
       setMessage("Không thể kết nối để đặt cược. Vui lòng thử lại.");
@@ -154,14 +207,17 @@ export default function HorseRacingGame({
       return;
     }
 
-    if (!response.ok || !data.race || !data.wallet || !data.finishOrder?.length) {
+    if (!response.ok || !data.pendingId || !data.race || !data.wallet || !data.finishOrder?.length) {
       setMessage(data.error || "Không thể đặt cược. Vui lòng kiểm tra lại số dư.");
       setSubmitting(false);
       return;
     }
 
+    const preparedRace = data as PreparedRace;
     setRace(data.race);
-    setOutcome(data);
+    setPendingRace(preparedRace);
+    setOutcome(null);
+    await onWalletUpdate(data.wallet.balance, data.wallet.debt);
     setRaceRunning(true);
     await new Promise<void>((resolve) => {
       const startedAt = performance.now();
@@ -169,7 +225,6 @@ export default function HorseRacingGame({
         const progress = Math.min((now - startedAt) / 15000, 1);
         setRaceProgress(progress);
         if (progress === 1) {
-          setRaceRunning(false);
           resolve();
         } else {
           window.requestAnimationFrame(animate);
@@ -177,13 +232,7 @@ export default function HorseRacingGame({
       };
       window.requestAnimationFrame(animate);
     });
-    setSubmitting(false);
-    try {
-      await onWalletUpdate(data.wallet.balance, data.wallet.debt);
-    } catch (error) {
-      console.error("Update wallet after horse race error:", error);
-      setMessage("Cuộc đua đã kết thúc nhưng không thể cập nhật số dư trên màn hình. Hãy tải lại trang.");
-    }
+    await settlePendingRace(preparedRace);
   };
 
   return (
@@ -210,7 +259,7 @@ export default function HorseRacingGame({
             <select
               value={raceNumber}
               onChange={(event) => handleRaceChange(event.target.value)}
-              disabled={submitting || raceRunning}
+              disabled={betControlsDisabled}
               className="mt-2 w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-400/60 disabled:opacity-60"
             >
               {raceNumbers.map((number) => (
@@ -233,9 +282,9 @@ export default function HorseRacingGame({
       <section className="space-y-4 rounded-3xl border border-white/10 bg-slate-900/70 p-5 sm:p-8">
         <StepHeading number={2} title="Chọn số tiền cược" />
         <div className="grid gap-3 sm:grid-cols-3">
-          <AmountButton selected={betMode === "custom"} label="Tùy chỉnh" detail="Nhập số tiền" disabled={submitting || raceRunning} onClick={() => selectBetMode("custom")} />
-          <AmountButton selected={betMode === "half"} label="50% số dư" detail={formatMoney(Math.floor(wallet.balance / 2))} disabled={submitting || raceRunning} onClick={() => selectBetMode("half")} />
-          <AmountButton selected={betMode === "all"} label="Tất cả số dư" detail={formatMoney(wallet.balance)} disabled={submitting || raceRunning} onClick={() => selectBetMode("all")} />
+          <AmountButton selected={betMode === "custom"} label="Tùy chỉnh" detail="Nhập số tiền" disabled={betControlsDisabled} onClick={() => selectBetMode("custom")} />
+          <AmountButton selected={betMode === "half"} label="50% số dư" detail={formatMoney(Math.floor(wallet.balance / 2))} disabled={betControlsDisabled} onClick={() => selectBetMode("half")} />
+          <AmountButton selected={betMode === "all"} label="Tất cả số dư" detail={formatMoney(wallet.balance)} disabled={betControlsDisabled} onClick={() => selectBetMode("all")} />
         </div>
         <label className="block max-w-xl text-sm font-semibold text-slate-200">
           Số tiền (VND)
@@ -249,7 +298,7 @@ export default function HorseRacingGame({
               setBetMode("custom");
               setCustomAmount(event.target.value);
             }}
-            disabled={betMode !== "custom" || submitting || raceRunning}
+            disabled={betMode !== "custom" || betControlsDisabled}
             placeholder="Ví dụ: 10.000"
             className="mt-2 w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-3 text-white outline-none focus:border-amber-400/60 disabled:opacity-60"
           />
@@ -269,7 +318,7 @@ export default function HorseRacingGame({
               key={type.value}
               type="button"
               aria-pressed={betType === type.value}
-              disabled={submitting || raceRunning}
+              disabled={betControlsDisabled}
               onClick={() => setBetType(type.value)}
               className={`rounded-2xl border p-4 text-left transition disabled:opacity-60 ${
                 betType === type.value
@@ -295,7 +344,7 @@ export default function HorseRacingGame({
               horse={horse}
               odds={race.odds[betType][horse.number - 1]}
               selected={selectedHorse === horse.number}
-              disabled={submitting || raceRunning}
+              disabled={betControlsDisabled}
               onSelect={() => {
                 setSelectedHorse(horse.number);
                 setMessage("");
@@ -327,7 +376,7 @@ export default function HorseRacingGame({
           <OvalRaceTrack
             race={race}
             progress={raceProgress}
-            finishOrder={outcome?.finishOrder ?? null}
+            finishOrder={outcome?.finishOrder ?? pendingRace?.finishOrder ?? null}
             running={raceRunning}
           />
         )}
@@ -367,6 +416,10 @@ export default function HorseRacingGame({
         <button
           type="button"
           onClick={() => {
+            if (pendingRace) {
+              void settlePendingRace(pendingRace);
+              return;
+            }
             if (outcome) {
               setOutcome(null);
               setRaceProgress(0);
@@ -375,10 +428,18 @@ export default function HorseRacingGame({
             }
             void confirmBet();
           }}
-          disabled={!race || raceLoading || !validAmount || !selectedHorse || submitting || raceRunning}
+          disabled={!race || raceLoading || (!pendingRace && !outcome && (!validAmount || !selectedHorse)) || submitting || raceRunning}
           className="mt-5 w-full rounded-xl border border-amber-300/50 bg-amber-500/20 px-5 py-4 text-lg font-black text-amber-100 transition hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {submitting ? "Đang xác nhận cược..." : raceRunning ? "Đang đua..." : outcome ? "Chơi lại" : "Xác nhận cược"}
+          {raceRunning
+            ? submitting && raceProgress >= 1 ? "Đang chốt kết quả..." : "Đang đua..."
+            : submitting
+              ? "Đang xác nhận cược..."
+              : pendingRace
+                ? "Hoàn tất cuộc đua"
+                : outcome
+                  ? "Chơi lại"
+                  : "Xác nhận cược"}
         </button>
         {message && !outcome && <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100" aria-live="polite">{message}</p>}
       </section>

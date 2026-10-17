@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { getHorseRaceCard, horseBetTypes, type HorseBetType } from "@/lib/horse-racing";
-import { resolveHorseRaceBet } from "@/lib/store";
+import { prepareHorseRaceBet, settleHorseRaceBet } from "@/lib/store";
 
 const getUserId = async () => {
   const session = await getServerSession(authOptions);
@@ -39,11 +39,28 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as {
+      action?: unknown;
       raceNumber?: unknown;
       amount?: unknown;
       betType?: unknown;
       horseNumber?: unknown;
+      pendingId?: unknown;
     };
+    if (body.action === "settle") {
+      if (typeof body.pendingId !== "string" || !/^[0-9a-f-]{36}$/i.test(body.pendingId)) {
+        return NextResponse.json({ error: "Ván đua không hợp lệ hoặc đã được chốt" }, { status: 400 });
+      }
+      const result = await settleHorseRaceBet(userId, body.pendingId);
+      if (!result) {
+        return NextResponse.json({ error: "Ván đua không hợp lệ hoặc đã được chốt" }, { status: 409 });
+      }
+      return NextResponse.json({ ok: true, ...result });
+    }
+
+    if (body.action !== "prepare") {
+      return NextResponse.json({ error: "Thao tác cược không hợp lệ" }, { status: 400 });
+    }
+
     const validBetType = horseBetTypes.some((bet) => bet.value === body.betType);
     if (!isValidRaceNumber(body.raceNumber) ||
         typeof body.amount !== "number" || !Number.isSafeInteger(body.amount) || body.amount <= 0 ||
@@ -54,16 +71,16 @@ export async function POST(request: NextRequest) {
     }
 
     const race = getHorseRaceCard(body.raceNumber);
-    const result = await resolveHorseRaceBet(
+    const result = await prepareHorseRaceBet(
       userId,
       body.amount,
       body.betType as HorseBetType,
       body.horseNumber,
       race,
     );
-    return NextResponse.json({ ...result, race });
+    return NextResponse.json({ ok: true, ...result, race });
   } catch (error) {
-    console.error("Resolve horse racing bet error:", error);
+    console.error("Horse racing bet error:", error);
     if (error instanceof Error && error.message === "INVALID_HORSE_RACE_BET") {
       return NextResponse.json({ error: "Số tiền cược không hợp lệ hoặc số dư không đủ" }, { status: 409 });
     }

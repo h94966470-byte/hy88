@@ -511,13 +511,14 @@ export async function updateWallet(userId: string, wallet: StoredWallet): Promis
   return mapWallet(result.rows[0] as WalletRow);
 }
 
-export async function resolveHorseRaceBet(
+export async function prepareHorseRaceBet(
   userId: string,
   amount: number,
   betType: HorseBetType,
   horseNumber: number,
   race: HorseRaceCard,
 ): Promise<{
+  pendingId: string;
   wallet: { balance: number; debt: number };
   won: boolean;
   finishPosition: number;
@@ -559,43 +560,42 @@ export async function resolveHorseRaceBet(
   const totalReturn = won ? Math.floor(amount * odds) : 0;
   if (!Number.isSafeInteger(totalReturn)) throw new Error("INVALID_HORSE_RACE_BET");
   const netProfit = totalReturn - amount;
-  const balanceDelta = netProfit;
+  const pendingId = crypto.randomUUID();
   const result = await sql`
     WITH wallet_update AS (
       UPDATE user_wallets
-      SET balance = balance + ${balanceDelta},
-          win_streak = ${won ? wallet.winStreak + 1 : 0},
-          loss_streak = ${won ? 0 : wallet.lossStreak + 1},
+      SET balance = balance - ${amount},
           updated_at = CURRENT_TIMESTAMP
       WHERE user_id = ${userId}
         AND balance >= ${amount}
         AND balance = ${wallet.balance}
         AND win_streak = ${wallet.winStreak}
         AND loss_streak = ${wallet.lossStreak}
-        AND balance + ${balanceDelta} >= 0
+        AND balance - ${amount} >= 0
       RETURNING balance, debt
     ),
-    recorded_race AS (
-      INSERT INTO horse_race_rounds (
+    pending_race AS (
+      INSERT INTO pending_horse_races (
         id, user_id, race_date, race_number, track_name, track_condition, distance,
-        bet_type, horse_number, amount, odds, finish_position, finish_order,
+        bet_type, horse_number, amount, odds, won, finish_position, finish_order,
         total_return, net_profit
       )
       SELECT
-        ${crypto.randomUUID()}, ${userId}, ${race.raceDate}::date, ${race.raceNumber},
+        ${pendingId}, ${userId}, ${race.raceDate}::date, ${race.raceNumber},
         ${race.trackName}, ${race.condition}, ${race.distance}, ${betType}, ${horseNumber},
-        ${amount}, ${odds}, ${finishPosition}, ${JSON.stringify(finishOrder)}::jsonb,
+        ${amount}, ${odds}, ${won}, ${finishPosition}, ${JSON.stringify(finishOrder)}::jsonb,
         ${totalReturn}, ${netProfit}
       FROM wallet_update
       RETURNING id
     )
     SELECT wallet_update.balance, wallet_update.debt
     FROM wallet_update
-    CROSS JOIN recorded_race
+    CROSS JOIN pending_race
   `;
   if (!result.rows.length) throw new Error("INVALID_HORSE_RACE_BET");
 
   return {
+    pendingId,
     wallet: {
       balance: Number(result.rows[0].balance),
       debt: Number(result.rows[0].debt),
@@ -606,6 +606,117 @@ export async function resolveHorseRaceBet(
     odds,
     totalReturn,
     netProfit,
+  };
+}
+
+export async function settleHorseRaceBet(
+  userId: string,
+  pendingId: string,
+): Promise<{
+  wallet: { balance: number; debt: number };
+  won: boolean;
+  finishPosition: number;
+  finishOrder: number[];
+  odds: number;
+  totalReturn: number;
+  netProfit: number;
+} | null> {
+  await ensureDatabaseReady();
+  const result = await sql`
+    WITH pending AS (
+      SELECT *
+      FROM pending_horse_races
+      WHERE id = ${pendingId}
+        AND user_id = ${userId}
+        AND settled_at IS NULL
+      FOR UPDATE
+    ),
+    wallet_update AS (
+      UPDATE user_wallets AS wallet
+      SET balance = wallet.balance + CASE WHEN pending.won THEN pending.total_return ELSE 0 END,
+          win_streak = CASE WHEN pending.won THEN wallet.win_streak + 1 ELSE 0 END,
+          loss_streak = CASE WHEN pending.won THEN 0 ELSE wallet.loss_streak + 1 END,
+          updated_at = CURRENT_TIMESTAMP
+      FROM pending
+      WHERE wallet.user_id = pending.user_id
+      RETURNING wallet.balance, wallet.debt
+    ),
+    settled AS (
+      UPDATE pending_horse_races AS pending_race
+      SET settled_at = CURRENT_TIMESTAMP
+      FROM wallet_update
+      WHERE pending_race.id = ${pendingId}
+        AND pending_race.user_id = ${userId}
+        AND pending_race.settled_at IS NULL
+      RETURNING pending_race.*
+    ),
+    recorded_race AS (
+      INSERT INTO horse_race_rounds (
+        id, user_id, race_date, race_number, track_name, track_condition, distance,
+        bet_type, horse_number, amount, odds, finish_position, finish_order,
+        total_return, net_profit
+      )
+      SELECT
+        settled.id, settled.user_id, settled.race_date, settled.race_number,
+        settled.track_name, settled.track_condition, settled.distance, settled.bet_type,
+        settled.horse_number, settled.amount, settled.odds, settled.finish_position,
+        settled.finish_order, settled.total_return, settled.net_profit
+      FROM settled
+      RETURNING id
+    )
+    SELECT
+      wallet_update.balance,
+      wallet_update.debt,
+      settled.won,
+      settled.finish_position,
+      settled.finish_order,
+      settled.odds,
+      settled.total_return,
+      settled.net_profit
+    FROM wallet_update
+    CROSS JOIN settled
+    CROSS JOIN recorded_race
+  `;
+  const settledResult = result.rows.length
+    ? result
+    : await sql`
+      SELECT
+        wallet.balance,
+        wallet.debt,
+        pending.won,
+        pending.finish_position,
+        pending.finish_order,
+        pending.odds,
+        pending.total_return,
+        pending.net_profit
+      FROM pending_horse_races AS pending
+      JOIN user_wallets AS wallet ON wallet.user_id = pending.user_id
+      WHERE pending.id = ${pendingId}
+        AND pending.user_id = ${userId}
+        AND pending.settled_at IS NOT NULL
+      LIMIT 1
+    `;
+  if (!settledResult.rows.length) return null;
+
+  const row = settledResult.rows[0] as {
+    balance: string | number;
+    debt: string | number;
+    won: boolean;
+    finish_position: number | string;
+    finish_order: number[] | string;
+    odds: number | string;
+    total_return: number | string;
+    net_profit: number | string;
+  };
+
+  return {
+    wallet: { balance: Number(row.balance), debt: Number(row.debt) },
+    won: row.won,
+    finishPosition: Number(row.finish_position),
+    finishOrder: typeof row.finish_order === "string" ? JSON.parse(row.finish_order) as number[] : row.finish_order,
+    odds: Number(row.odds),
+    totalReturn: Number(row.total_return),
+    netProfit: Number(row.net_profit),
   };
 }
 
