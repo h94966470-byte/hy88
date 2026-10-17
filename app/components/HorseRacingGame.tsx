@@ -472,13 +472,17 @@ function HorseFormCard({
 }
 
 function getHorseProgress(progress: number, rank: number, horseNumber: number) {
-  const targetProgress = 1.006 + ((5 - rank) / 4) * 0.02;
+  const targetProgress = getHorseFinishProgress(rank);
   const phase = horseNumber * 1.37 + rank * 0.71;
   const speedSwing = 0.82;
   const variedProgress = progress + (
     Math.cos(phase) - Math.cos(progress * Math.PI * 2 + phase)
   ) * speedSwing / (Math.PI * 2);
   return targetProgress * variedProgress;
+}
+
+function getHorseFinishProgress(rank: number) {
+  return 1.04 + ((5 - rank) / 4) * 0.16;
 }
 
 function OvalRaceTrack({
@@ -583,12 +587,13 @@ function OvalRaceTrack({
           const horseProgress = running && finishOrder
             ? getHorseProgress(progress, rank, horse.number)
             : finishOrder && progress >= 1
-              ? 1.006 + ((5 - rank) / 4) * 0.02
+              ? getHorseFinishProgress(rank)
               : 0;
           const angle = -Math.PI / 2 + horseProgress * Math.PI * 2;
           const radii = laneRadii[index];
           const x = 400 + radii.x * Math.cos(angle);
           const y = 220 + radii.y * Math.sin(angle);
+          const hasFinished = Boolean(finishOrder && !running && progress >= 1);
 
           return (
             <g
@@ -596,6 +601,14 @@ function OvalRaceTrack({
               transform={`translate(${x} ${y})`}
               filter="url(#race-horse-shadow)"
             >
+              {hasFinished && (
+                <g transform="translate(0 -29)">
+                  <circle r="10" fill="#fbbf24" stroke="#fff" strokeWidth="1.5" />
+                  <text y="4" textAnchor="middle" fill="#111827" fontSize="11" fontWeight="900">
+                    {rank}
+                  </text>
+                </g>
+              )}
               <circle r="17" fill={horse.color} stroke="#fff" strokeOpacity="0.75" strokeWidth="2" />
               <text
                 y="5"
@@ -612,7 +625,10 @@ function OvalRaceTrack({
         })}
       </svg>
       <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-slate-300">
-        {race.horses.map((horse) => (
+        {(finishOrder && !running && progress >= 1
+          ? finishOrder.map((number) => race.horses.find((horse) => horse.number === number)).filter((horse): horse is RacingHorse => Boolean(horse))
+          : race.horses
+        ).map((horse) => (
           <span key={horse.number} className="inline-flex items-center gap-1.5">
             <span className="h-3 w-3 rounded-full" style={{ backgroundColor: horse.color }} />
             #{horse.number} {horse.name}
