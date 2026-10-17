@@ -295,6 +295,16 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
   if (!wallet) return null;
 
   const actualBalance = wallet.balance;
+  const selectedBetAmount = betType === "all"
+    ? actualBalance
+    : betType === "half"
+      ? Math.floor(actualBalance / 2)
+      : Number(betAmount);
+  const validBetAmount = Number.isSafeInteger(selectedBetAmount) &&
+    selectedBetAmount > 0 &&
+    selectedBetAmount <= actualBalance;
+  const displayedBetAmount = pendingBet?.amount ??
+    (validBetAmount ? selectedBetAmount : null);
   const historyForPanel = historyBeforeRound ?? roundHistory;
 
   const settleBet = async (bet: PendingBet): Promise<boolean> => {
@@ -380,12 +390,12 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
 
     if (wagerMode === "tai-xiu" && !choice) return;
 
-    const amount = betType === "all" ? actualBalance : betType === "half" ? Math.floor(actualBalance / 2) : Number(betAmount);
-    if (!amount || amount <= 0 || amount > actualBalance) {
+    if (!validBetAmount) {
       setMessage("Số tiền cược không hợp lệ");
       return;
     }
 
+    const amount = selectedBetAmount;
     setPlaying(true);
     setRolling(true);
     setGameResult(null);
@@ -496,19 +506,19 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
           </div>
 
           <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-center">
-            <p className="text-xs uppercase text-red-300">
+            <p className="text-xs uppercase text-amber-200">
               {gameResult
                 ? gameResult.won ? "Tiền cộng sau khi thắng" : "Tiền trừ sau khi thua"
                 : pendingBet?.pendingId
                   ? "Tiền cược đã trừ"
-                  : pendingBet ? "Đang xử lý tiền cược" : "Tiền cược"}
+                  : pendingBet ? "Đang xử lý tiền cược" : "Tiền vào cược"}
             </p>
             <p className={`mt-1 text-xl font-bold ${gameResult?.won ? "text-emerald-200" : "text-white"}`}>
               {gameResult
                 ? `${gameResult.won ? "+" : "-"}${(gameResult.won ? gameResult.profit : gameResult.amount).toLocaleString("vi-VN")} VND`
-                : pendingBet
-                  ? `${pendingBet.amount.toLocaleString("vi-VN")} VND`
-                  : "Chưa đặt cược"}
+                : displayedBetAmount === null
+                  ? "—"
+                  : `${displayedBetAmount.toLocaleString("vi-VN")} VND`}
             </p>
           </div>
 
@@ -615,7 +625,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                   onChoose={(choice) => {
                     void rollGame(choice);
                   }}
-                  disabled={playing || (!betAmount && betType === "custom")}
+                  disabled={playing || !validBetAmount}
                   dice={[1, 3, 5]}
                 />
               ) : <button
@@ -623,7 +633,7 @@ export default function GameCenter({ wallet, onWalletUpdate }: GameCenterProps) 
                 onClick={() => {
                   void rollGame();
                 }}
-                disabled={playing || (!betAmount && betType === "custom")}
+                disabled={playing || !validBetAmount}
                 className="w-full rounded-2xl border border-violet-400/40 bg-violet-500/10 px-6 py-4 font-bold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50"
               >
                 Đặt cược {wagerMode === "triple" ? "Bộ Ba" : wagerMode === "pair" ? "Cặp" : wagerMode === "total" ? "Tổng Điểm" : "Số Đơn Lẻ"}
