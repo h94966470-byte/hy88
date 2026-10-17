@@ -476,15 +476,12 @@ function HorseFormCard({
 
 function getHorseProgress(progress: number, rank: number, horseNumber: number) {
   const targetProgress = 1.006 + ((5 - rank) / 4) * 0.02;
-  const preFinishProgress =
-    progress * 0.86 +
-    Math.sin((progress * 2.4 + horseNumber * 0.31) * Math.PI * 2) *
-      0.09 * Math.sin(progress * Math.PI) +
-    Math.sin((progress * 5.3 + horseNumber * 0.73) * Math.PI * 2) *
-      0.025 * Math.sin(progress * Math.PI);
-  const settleProgress = Math.max(0, Math.min((progress - 0.65) / 0.35, 1));
-  const settle = settleProgress * settleProgress * (3 - 2 * settleProgress);
-  return preFinishProgress * (1 - settle) + targetProgress * settle;
+  const phase = horseNumber * 1.37 + rank * 0.71;
+  const speedSwing = 0.82;
+  const variedProgress = progress + (
+    Math.cos(phase) - Math.cos(progress * Math.PI * 2 + phase)
+  ) * speedSwing / (Math.PI * 2);
+  return targetProgress * variedProgress;
 }
 
 function OvalRaceTrack({
