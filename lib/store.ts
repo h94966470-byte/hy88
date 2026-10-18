@@ -1141,7 +1141,7 @@ export async function getGameRoundCount(): Promise<number> {
   return Number((result.rows[0] as { count: string | number }).count);
 }
 
-export async function getLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
+export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
   await ensureDatabaseReady();
   const result = await sql`
     SELECT
@@ -1155,7 +1155,7 @@ export async function getLeaderboard(limit = 50): Promise<LeaderboardEntry[]> {
     LEFT JOIN game_rounds g ON g.user_id = u.id
     GROUP BY u.id, u.username, w.balance
     ORDER BY COALESCE(w.balance, 100000) DESC, wins DESC, u.username ASC
-    LIMIT ${limit}
+    LIMIT 5
   `;
 
   return (result.rows as Array<{ username: string; balance: string | number; rounds: string | number; wins: string | number; losses: string | number }>).map((row) => {
